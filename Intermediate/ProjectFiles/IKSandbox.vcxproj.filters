@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<ItemGroup>
+		<None Include="..\..\IKSandbox.uproject" />
+		<Filter Include="Source">
+			<UniqueIdentifier>{1370E37D-7E1A-48B4-B964-487D02D5706D}</UniqueIdentifier>
+		</Filter>
+		<None Include="..\..\Source\IKSandbox.Target.cs">
+			<Filter>Source</Filter>
+		</None >
+		<None Include="..\..\Source\IKSandboxEditor.Target.cs">
+			<Filter>Source</Filter>
+		</None >
+		<Filter Include="Config">
+			<UniqueIdentifier>{ECAB98DD-92AE-4120-A22A-1941FD65EE7F}</UniqueIdentifier>
+		</Filter>
+		<None Include="..\..\Config\DefaultEditor.ini">
+			<Filter>Config</Filter>
+		</None >
+		<None Include="..\..\Config\DefaultEditorPerProjectUserSettings.ini">
+			<Filter>Config</Filter>
+		</None >
+		<None Include="..\..\Config\DefaultEngine.ini">
+			<Filter>Config</Filter>
+		</None >
+		<None Include="..\..\Config\DefaultGame.ini">
+			<Filter>Config</Filter>
+		</None >
+		<None Include="..\..\Config\DefaultInput.ini">
+			<Filter>Config</Filter>
+		</None >
+		<Filter Include="Source\IKSandbox">
+			<UniqueIdentifier>{B0D64617-D26E-4E9C-AD8B-A21B97FECCA8}</UniqueIdentifier>
+		</Filter>
+		<None Include="..\..\Source\IKSandbox\IKSandbox.Build.cs">
+			<Filter>Source\IKSandbox</Filter>
+		</None >
+		<ClCompile Include="..\..\Source\IKSandbox\IKSandbox.cpp">
+			<Filter>Source\IKSandbox</Filter>
+		</ClCompile >
+		<ClInclude Include="..\..\Source\IKSandbox\IKSandbox.h">
+			<Filter>Source\IKSandbox</Filter>
+		</ClInclude >
+		<ClCompile Include="..\..\Source\IKSandbox\IKSandboxCharacter.cpp">
+			<Filter>Source\IKSandbox</Filter>
+		</ClCompile >
+		<ClInclude Include="..\..\Source\IKSandbox\IKSandboxCharacter.h">
+			<Filter>Source\IKSandbox</Filter>
+		</ClInclude >
+		<ClCompile Include="..\..\Source\IKSandbox\IKSandboxGameMode.cpp">
+			<Filter>Source\IKSandbox</Filter>
+		</ClCompile >
+		<ClInclude Include="..\..\Source\IKSandbox\IKSandboxGameMode.h">
+			<Filter>Source\IKSandbox</Filter>
+		</ClInclude >
+	</ItemGroup>
+</Project>
