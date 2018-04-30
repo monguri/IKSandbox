@@ -15,6 +15,9 @@ struct IKPLUGINSANDBOX_API FAnimNode_LookAtPractice : public FAnimNode_SkeletalC
 {
 	GENERATED_USTRUCT_BODY()
 	
+	/** Name of bone to control. This is the main bone chain to modify from. **/
+	UPROPERTY(EditAnywhere, Category=SkeletalControl) 
+	FBoneReference BoneToModify;
 	
 	
 	
