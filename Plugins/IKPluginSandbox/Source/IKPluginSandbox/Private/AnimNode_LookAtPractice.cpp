@@ -88,7 +88,8 @@ bool FAnimNode_LookAtPractice::IsValidToEvaluate(const USkeleton* Skeleton, cons
 void FAnimNode_LookAtPractice::InitializeBoneReferences(const FBoneContainer& RequiredBones)
 {
 	BoneToModify.Initialize(RequiredBones);
-	LookAtTarget.InitializeBoneReferences(RequiredBones);
+	// TODO:なぜかリンクが通らないので、この処理がないと正常に動かないがとりあえずコメントアウト
+	//LookAtTarget.InitializeBoneReferences(RequiredBones);
 }
 
 void FAnimNode_LookAtPractice::UpdateInternal(const FAnimationUpdateContext& Context)
@@ -101,7 +102,8 @@ void FAnimNode_LookAtPractice::Initialize_AnyThread(const FAnimationInitializeCo
 	// TODO:InitializeBoneReferencesとの違いってなんだっけ？
 	FAnimNode_SkeletalControlBase::Initialize_AnyThread(Context);
 
-	LookAtTarget.Initialize(Context.AnimInstanceProxy);
+	// TODO:なぜかリンクが通らないので、この処理がないと正常に動かないがとりあえずコメントアウト
+	//LookAtTarget.Initialize(Context.AnimInstanceProxy);
 
 	// initialize
 	LookUp_Axis.Initialize();
