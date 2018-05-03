@@ -7,11 +7,43 @@
 static const FVector DefaultLookAtAxis(0.0f, 1.0f, 0.0f);
 static const FVector DefaultLookUpAxis(0.0f, 0.0f, 1.0f);
 
+namespace
+{
+/** 
+ * Aim solver
+ *
+ * This solves new transform that aims at the target based on inputs
+ *
+ * @param	CurrentTransform	Current Transform
+ * @param	TargetPosition		Target to look at
+ * @param	AimVector			Aim vector in Current Transform
+ * @param	bUseUpVector		Whether or not to use Up vector
+ * @param	UpVector			Up Vector in Current Transform if bUseUpVector is true
+ * @param	AimClampInDegree	Clamp cone around the AimVector
+ *
+ * @return  Delta Rotation to turn
+ */
+FQuat SolveAim(const FTransform& CurrentTransform, const FVector& TargetPosition, const FVector& AimVector, bool bUseUpVector /*= false*/, const FVector& UpVector /*= FVector::UpVector*/)
+{
+	if (!ensureAlways(AimVector.IsNormalized())
+		|| bUseUpVector && !ensureAlways(UpVector.IsNormalized())
+		)
+	{
+		return FQuat::Identity;
+	}
+
+	FTransform NewTransform = CurrentTransform;
+	FVector ToTarget = TargetPosition - NewTransform.GetLocation();
+	ToTarget.Normalize();
+
+	return FQuat::FindBetweenNormals(AimVector, ToTarget);
+}
+}
+
 FAnimNode_LookAtPractice::FAnimNode_LookAtPractice()
 	: LookAtLocation(FVector(100.f, 0.f, 0.f))
 	, LookAt_Axis(DefaultLookAtAxis)
 	, LookUp_Axis(DefaultLookUpAxis)
-	, LookAtClamp(0.f)
 {
 }
 
@@ -37,7 +69,7 @@ void FAnimNode_LookAtPractice::EvaluateSkeletalControl_AnyThread(FComponentSpace
 	// find look up vector in local space
 	FVector LookUpVector = LookUp_Axis.GetTransformedAxis(ComponentBoneTransform);
 	// Find new transform from look at info
-	FQuat DeltaRotation = AnimationCore::SolveAim(ComponentBoneTransform, TargetLocationInComponentSpace, LookAtVector, bUseLookUpAxis, LookUpVector, LookAtClamp);
+	FQuat DeltaRotation = SolveAim(ComponentBoneTransform, TargetLocationInComponentSpace, LookAtVector, bUseLookUpAxis, LookUpVector);
 	ComponentBoneTransform.SetRotation(DeltaRotation * ComponentBoneTransform.GetRotation());
 	// Set New Transform 
 	OutBoneTransforms.Add(FBoneTransform(ModifyBoneIndex, ComponentBoneTransform));

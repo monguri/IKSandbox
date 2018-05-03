@@ -38,10 +38,6 @@ struct IKPLUGINSANDBOX_API FAnimNode_LookAtPractice : public FAnimNode_SkeletalC
 	UPROPERTY(EditAnywhere, Category = SkeletalControl)
 	FAxis LookUp_Axis;
 
-	/** Look at Clamp value in degree - if you're look at axis is Z, only X, Y degree of clamp will be used*/
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=SkeletalControl, meta=(PinHiddenByDefault))
-	float LookAtClamp;
-
 	// in the future, it would be nice to have more options, -i.e. lag, interpolation speed
 	FAnimNode_LookAtPractice();
 
