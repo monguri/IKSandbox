@@ -52,8 +52,9 @@ void FAnimNode_TwoBoneIKPractice::InitializeBoneReferences(const FBoneContainer&
 {
 	IKBone.Initialize(RequiredBones);
 
-	EffectorTarget.InitializeBoneReferences(RequiredBones);
-	JointTarget.InitializeBoneReferences(RequiredBones);
+	//TODO:なぜかリンクエラーになるので必要な処理だがとりあえずコメントアウト
+	//EffectorTarget.InitializeBoneReferences(RequiredBones);
+	//JointTarget.InitializeBoneReferences(RequiredBones);
 
 	FCompactPoseBoneIndex IKBoneCompactPoseIndex = IKBone.GetCompactPoseIndex(RequiredBones);
 	CachedLowerLimbIndex = FCompactPoseBoneIndex(INDEX_NONE);
@@ -72,6 +73,7 @@ void FAnimNode_TwoBoneIKPractice::InitializeBoneReferences(const FBoneContainer&
 void FAnimNode_TwoBoneIKPractice::Initialize_AnyThread(const FAnimationInitializeContext& Context)
 {
 	FAnimNode_SkeletalControlBase::Initialize_AnyThread(Context);
-	EffectorTarget.Initialize(Context.AnimInstanceProxy);
-	JointTarget.Initialize(Context.AnimInstanceProxy);
+	//TODO:なぜかリンクエラーになるので必要な処理だがとりあえずコメントアウト
+	//EffectorTarget.Initialize(Context.AnimInstanceProxy);
+	//JointTarget.Initialize(Context.AnimInstanceProxy);
 }
