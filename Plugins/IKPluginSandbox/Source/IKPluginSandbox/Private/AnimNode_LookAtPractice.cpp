@@ -54,7 +54,7 @@ void FAnimNode_LookAtPractice::EvaluateComponentSpaceInternal(FComponentSpacePos
 
 void FAnimNode_LookAtPractice::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
 {
-	check(OutBoneTransforms.Num() > 0);
+	check(OutBoneTransforms.Num() == 0);
 
 	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
 	const FCompactPoseBoneIndex& ModifyBoneIndex = BoneToModify.GetCompactPoseIndex(BoneContainer);
