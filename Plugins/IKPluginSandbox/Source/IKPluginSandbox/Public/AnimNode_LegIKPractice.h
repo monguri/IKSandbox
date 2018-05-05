@@ -61,6 +61,8 @@ public:
 	TArray<FTransform > FKLegBoneTransforms;
 
 public:
+	void InitializeTransforms(USkeletalMeshComponent* SkelComp, FCSPose<FCompactPose>& MeshBases);
+
 	FAnimLegIKDataPractice()
 		: IKFootBoneIndex(INDEX_NONE)
 		, LegDefPtr(nullptr)

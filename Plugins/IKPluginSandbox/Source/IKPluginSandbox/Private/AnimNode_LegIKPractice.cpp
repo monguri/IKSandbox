@@ -9,6 +9,68 @@ FAnimNode_LegIKPractice::FAnimNode_LegIKPractice()
 	MaxIterations = 12;
 }
 
+void FAnimLegIKDataPractice::InitializeTransforms(USkeletalMeshComponent* SkelComp, FCSPose<FCompactPose>& MeshBases)
+{
+	// Initialize bone transforms
+	IKFootTransform = MeshBases.GetComponentSpaceTransform(IKFootBoneIndex);
+
+	FKLegBoneTransforms.Reset();
+	for (FCompactPoseBoneIndex LegBoneIndex : FKLegBoneIndices)
+	{
+		FKLegBoneTransforms.Add(MeshBases.GetComponentSpaceTransform(LegBoneIndex));
+	}
+}
+
+namespace
+{
+bool RotateLegByQuat(const FQuat& InDeltaRotation, FAnimLegIKDataPractice& InLegData)
+{
+	if (!InDeltaRotation.IsIdentity())
+	{
+		const FVector HipLocation = InLegData.FKLegBoneTransforms.Last().GetLocation();
+
+		// Rotate Leg so it is aligned with IK Target
+		for (FTransform LegBoneTransform : InLegData.FKLegBoneTransforms)
+		{
+			LegBoneTransform.SetRotation(InDeltaRotation * LegBoneTransform.GetRotation());
+
+			//TODO:Rotationをセットしたのに、それとは別にロケーションのセットがいるのか？コンポーネント座標だから？
+			const FVector BoneLocation = LegBoneTransform.GetLocation();
+			LegBoneTransform.SetLocation(HipLocation + InDeltaRotation.RotateVector(BoneLocation - HipLocation));
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+bool RotateLegByDeltaNormals(const FVector& InInitialDir, const FVector& InTargetDir, FAnimLegIKDataPractice& InLegData)
+{
+	if (!InInitialDir.IsZero() && !InTargetDir.IsZero())
+	{
+		// Find Delta Rotation take takes us from Old to New dir
+		const FQuat DeltaRotation = FQuat::FindBetweenNormals(InInitialDir, InTargetDir);
+		return RotateLegByQuat(DeltaRotation, InLegData);
+	}
+
+	return false;
+
+}
+
+void OrientLegTowardsIK(FAnimLegIKDataPractice& InLegData, USkeletalMeshComponent* SkelComp)
+{
+	check(InLegData.NumBones > 0);
+
+	const FVector HipLocation = InLegData.FKLegBoneTransforms.Last().GetLocation();
+	const FVector FootFKLocation = InLegData.FKLegBoneTransforms[0].GetLocation();
+	const FVector FootIKLocation = InLegData.IKFootTransform.GetLocation();
+
+	const FVector InitialDir = (FootFKLocation - HipLocation).GetSafeNormal();
+	const FVector TargetDir = (FootIKLocation - HipLocation).GetSafeNormal();
+}
+}
+
 void FAnimNode_LegIKPractice::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
 {
 	check(Output.AnimInstanceProxy->GetSkelMeshComponent());
@@ -18,6 +80,10 @@ void FAnimNode_LegIKPractice::EvaluateSkeletalControl_AnyThread(FComponentSpaceP
 	{
 		for (FAnimLegIKDataPractice& LegData : LegsData)
 		{
+			LegData.InitializeTransforms(Output.AnimInstanceProxy->GetSkelMeshComponent(), Output.Pose);
+
+			// rotate hips so foot aligns with effector.
+			OrientLegTowardsIK(LegData, Output.AnimInstanceProxy->GetSkelMeshComponent());
 
 			// Add transforms
 			for (int32 Index = 0; Index < LegData.NumBones; Index++)
