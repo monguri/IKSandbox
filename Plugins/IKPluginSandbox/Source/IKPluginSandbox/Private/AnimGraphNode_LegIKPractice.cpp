@@ -15,12 +15,12 @@ UAnimGraphNode_LegIKPractice::UAnimGraphNode_LegIKPractice(const FObjectInitiali
 
 FText UAnimGraphNode_LegIKPractice::GetControllerDescription() const
 {
-	return LOCTEXT("LegIK", "Leg IK");
+	return LOCTEXT("LegIKPractice", "Leg IK Practice");
 }
 
 FText UAnimGraphNode_LegIKPractice::GetTooltipText() const
 {
-	return LOCTEXT("AnimGraphNode_LegIK_Tooltip", "IK node for multi-bone legs.");
+	return LOCTEXT("AnimGraphNode_LegIKPractice_Tooltip", "IK node for multi-bone legs.");
 }
 
 FText UAnimGraphNode_LegIKPractice::GetNodeTitle(ENodeTitleType::Type TitleType) const
