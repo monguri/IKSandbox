@@ -48,7 +48,24 @@ USTRUCT()
 struct FAnimLegIKDataPractice
 {
 	GENERATED_USTRUCT_BODY()
-	// TODO:後で必要になった時に必要になったものを定義する
+
+public:
+	FCompactPoseBoneIndex IKFootBoneIndex;
+	FTransform IKFootTransform;
+
+	//TODO:生ポインタで持っているが大丈夫か？
+	FAnimLegIKDefinitionPractice* LegDefPtr;
+
+	int32 NumBones;
+	TArray<FCompactPoseBoneIndex> FKLegBoneIndices;
+	TArray<FTransform > FKLegBoneTransforms;
+
+public:
+	FAnimLegIKDataPractice()
+		: IKFootBoneIndex(INDEX_NONE)
+		, LegDefPtr(nullptr)
+		, NumBones(INDEX_NONE)
+	{}
 };
 
 USTRUCT()
