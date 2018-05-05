@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "AnimNode_LegIKPractice.h"
-#include "BoneContainer.h"
+#include "Animation/AnimInstanceProxy.h"
 
 FAnimNode_LegIKPractice::FAnimNode_LegIKPractice()
 {
@@ -11,11 +11,29 @@ FAnimNode_LegIKPractice::FAnimNode_LegIKPractice()
 
 void FAnimNode_LegIKPractice::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
 {
+	check(Output.AnimInstanceProxy->GetSkelMeshComponent());
+	check(OutBoneTransforms.Num() == 0);
+
+	// Get transforms for each leg.
+	{
+		for (FAnimLegIKDataPractice& LegData : LegsData)
+		{
+
+			// Add transforms
+			for (int32 Index = 0; Index < LegData.NumBones; Index++)
+			{
+				OutBoneTransforms.Add(FBoneTransform(LegData.FKLegBoneIndices[Index], LegData.FKLegBoneTransforms[Index]));
+			}
+		}
+	}
+
+	// Sort OutBoneTransforms so indices are in increasing order.
+	OutBoneTransforms.Sort(FCompareBoneTransformIndex());
 }
 
 bool FAnimNode_LegIKPractice::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
 {
-	return true;
+	return (LegsData.Num() > 0); // InitializeBoneReferencesは確かコンパイル時に呼ばれるけどこっちは実行時に呼ばれる
 }
 
 namespace
