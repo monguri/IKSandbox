@@ -71,17 +71,53 @@ public:
 };
 
 USTRUCT()
+/** IK計算専用のワークデータクラス */
 struct FIKChainLinkPractice
 {
 	GENERATED_USTRUCT_BODY()
-	// TODO:後で必要になった時に必要になったものを定義する
+
+	FVector Location;
+	float Length;
+	FVector LinkAxisZ;
+
+	FIKChainLinkPractice()
+		: Location(FVector::ZeroVector)
+		, Length(0.f)
+		, LinkAxisZ(FVector::ZeroVector)
+	{}
+
+	FIKChainLinkPractice(FVector InLocation, float InLength)
+		: Location(InLocation)
+		, Length(InLength)
+		, LinkAxisZ(FVector::ZeroVector)
+	{}
 };
 
 USTRUCT()
+/** IK計算専用のワークデータクラス */
 struct FIKChainPractice
 {
 	GENERATED_USTRUCT_BODY()
-	// TODO:後で必要になった時に必要になったものを定義する
+
+public:
+	TArray<FIKChainLinkPractice> Links;
+	float MinRotationAngleRadians;
+
+private:
+	bool bInitialized;
+	float MaximumReach;
+	int32 NumLinks;
+	bool bEnableRotationLimit;
+	USkeletalMeshComponent* SkelMeshComp;
+
+public:
+	FIKChainPractice()
+		: bInitialized(false)
+		, MaximumReach(0.f)
+	{}
+
+	void InitializeFromLegData(const FAnimLegIKDataPractice& InLegData, USkeletalMeshComponent* InSkelMeshComp);
+	void ReachTarget(const FVector& InTargetLocation, float InReachPrecision, int32 InMaxIterations);
 };
 
 USTRUCT(BlueprintInternalUseOnly)

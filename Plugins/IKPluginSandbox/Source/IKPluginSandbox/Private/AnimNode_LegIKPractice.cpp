@@ -69,6 +69,97 @@ void OrientLegTowardsIK(FAnimLegIKDataPractice& InLegData, USkeletalMeshComponen
 	const FVector InitialDir = (FootFKLocation - HipLocation).GetSafeNormal();
 	const FVector TargetDir = (FootIKLocation - HipLocation).GetSafeNormal();
 }
+
+void DoLegReachIK(FAnimLegIKDataPractice& InLegData, USkeletalMeshComponent* SkelComp, float InReachPrecision, int32 InMaxIterations)
+{
+	const FVector& FootFKLocation = InLegData.FKLegBoneTransforms[0].GetLocation();
+	const FVector& FootIKLocation = InLegData.IKFootTransform.GetLocation();
+	
+	// If we're already reaching our IK Target, we have no work to do.
+	if (FootFKLocation.Equals(FootIKLocation, InReachPrecision))
+	{
+		return;
+	}
+
+	//これから行うFABRIK計算のために用いるワークデータを作る
+	FIKChainPractice IKChain;
+	IKChain.InitializeFromLegData(InLegData, SkelComp);
+
+	// FABRIK計算を行う
+	IKChain.ReachTarget(FootIKLocation, InReachPrecision, InMaxIterations);
+
+	// FABRIK計算した結果のFIKChainPracticeをスケルトンのポーズに反映する
+	// Update bone transforms based on IKChain
+
+	// Rotations
+	for (int32 LinkIndex = InLegData.NumBones - 2; LinkIndex >= 0; LinkIndex--) // ヒップジョイントは含めず、その一つ子からエフェクタまでループ
+	{
+		const FIKChainLinkPractice ParentLink = IKChain.Links[LinkIndex + 1];
+		const FIKChainLinkPractice CurrentLink = IKChain.Links[LinkIndex];
+
+		FTransform& ParentTransform = InLegData.FKLegBoneTransforms[LinkIndex + 1];
+		const FTransform& CurrentTransform = InLegData.FKLegBoneTransforms[LinkIndex];
+
+		// Calculate pre-translation vector between this bone and child
+		const FVector InitialDir = (CurrentTransform.GetLocation() - ParentTransform.GetLocation()).GetSafeNormal();
+
+		// Get vector from the post-translation bone to it's child
+		const FVector TargetlDir = (CurrentLink.Location - ParentLink.Location).GetSafeNormal();
+
+		const FQuat DeltaRotation = FQuat::FindBetweenNormals(TargetlDir, InitialDir);
+		ParentTransform.SetRotation(DeltaRotation * ParentTransform.GetRotation());
+	}
+
+	// Translations
+	for (int32 LinkIndex = InLegData.NumBones - 2; LinkIndex >= 0; LinkIndex--) // ヒップジョイントは含めず、その一つ子からエフェクタまでループ
+	{
+		const FIKChainLinkPractice CurrentLink = IKChain.Links[LinkIndex];
+		FTransform& CurrentTransform = InLegData.FKLegBoneTransforms[LinkIndex];
+		CurrentTransform.SetTranslation(CurrentLink.Location);
+	}
+}
+}
+
+void FIKChainPractice::InitializeFromLegData(const FAnimLegIKDataPractice& InLegData, USkeletalMeshComponent* InSkelMeshComp)
+{
+	// FAnimLegIKDataPracticeではジョイント単位でデータをもっていたが、IK計算ではジョイントの間をつなぐリンク(それこそボーン的なもの)単位で
+	// ワークデータを持つようにする
+	Links.Reset(InLegData.NumBones);
+	MaximumReach = 0.0f;
+
+	check(InLegData.NumBones > 1);
+	for (int32 Index = 0; Index < InLegData.NumBones - 1; Index++)
+	{
+		const FVector BoneLocation = InLegData.FKLegBoneTransforms[Index].GetLocation();
+		const FVector ParentLocation = InLegData.FKLegBoneTransforms[Index + 1].GetLocation();
+		const float BoneLength = FVector::Dist(BoneLocation, ParentLocation);
+		Links.Add(FIKChainLinkPractice(BoneLocation, BoneLength)); //親からでなく子を基準にしてチェインリンクを作るんだね
+		MaximumReach += BoneLength;
+	}
+
+	// Add root bone last
+	// ヒップジョイントは長さ0という扱いで最後に入れる。これでNumBones個のリンクができる。配列の扱いをFKLegBoneIndices/FKLegBoneTransformsと
+	// 同じにできるように、あえて不要なヒップジョイントを入れている模様
+	const FVector RootLocation = InLegData.FKLegBoneTransforms.Last().GetLocation();
+	Links.Add(FIKChainLinkPractice(RootLocation, 0.0f));
+	NumLinks = Links.Num();
+	check(NumLinks == InLegData.NumBones);
+
+	if (InLegData.LegDefPtr != NULL)
+	{
+		bEnableRotationLimit = InLegData.LegDefPtr->bEnableRotationLimit;
+		if (bEnableRotationLimit)
+		{
+			MinRotationAngleRadians = FMath::DegreesToRadians(FMath::Clamp(InLegData.LegDefPtr->MinRotationAngle, 0.0f, 90.0f));
+		}
+	}
+
+	SkelMeshComp = InSkelMeshComp;
+	bInitialized = (SkelMeshComp != NULL);
+}
+
+void FIKChainPractice::ReachTarget(const FVector& InTargetLocation, float InReachPrecision, int32 InMaxIterations)
+{
 }
 
 void FAnimNode_LegIKPractice::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
@@ -84,6 +175,13 @@ void FAnimNode_LegIKPractice::EvaluateSkeletalControl_AnyThread(FComponentSpaceP
 
 			// rotate hips so foot aligns with effector.
 			OrientLegTowardsIK(LegData, Output.AnimInstanceProxy->GetSkelMeshComponent());
+
+			// expand/compress leg, so foot reaches effector.
+			DoLegReachIK(LegData, Output.AnimInstanceProxy->GetSkelMeshComponent(), ReachPrecision, MaxIterations);
+
+			// Override Foot FK, with IK.
+			//TODO:これはなぜやるのかわからない
+			LegData.FKLegBoneTransforms[0].SetRotation(LegData.IKFootTransform.GetRotation());
 
 			// Add transforms
 			for (int32 Index = 0; Index < LegData.NumBones; Index++)
