@@ -55,7 +55,6 @@ bool RotateLegByDeltaNormals(const FVector& InInitialDir, const FVector& InTarge
 	}
 
 	return false;
-
 }
 
 void OrientLegTowardsIK(FAnimLegIKDataPractice& InLegData, USkeletalMeshComponent* SkelComp)
@@ -68,6 +67,8 @@ void OrientLegTowardsIK(FAnimLegIKDataPractice& InLegData, USkeletalMeshComponen
 
 	const FVector InitialDir = (FootFKLocation - HipLocation).GetSafeNormal();
 	const FVector TargetDir = (FootIKLocation - HipLocation).GetSafeNormal();
+
+	RotateLegByDeltaNormals(InitialDir, TargetDir, InLegData);
 }
 
 void DoLegReachIK(FAnimLegIKDataPractice& InLegData, USkeletalMeshComponent* SkelComp, float InReachPrecision, int32 InMaxIterations)
@@ -191,8 +192,117 @@ void FIKChainPractice::OrientAllLinksToDirection(const FVector& InDirection)
 	}
 }
 
+namespace
+{
+FVector FindPlaneNormal(const TArray<FIKChainLinkPractice>& Links, const FVector& RootLocation, const FVector& TargetLocation)
+{
+	// UE4では、通常はボーンの方向がX方向。
+	const FVector AxisX = (TargetLocation - RootLocation).GetSafeNormal();
+
+	// ヒップから順にリンクをたどっていき、AxisXと平面を定義できるベクトルが見つかればそれで平面を定義する
+	for (int32 LinkIdx = Links.Num() - 2; LinkIdx >= 0; LinkIdx--)
+	{
+		const FVector AxisY = (Links[LinkIdx].Location - RootLocation).GetSafeNormal();
+		const FVector PlaneNormal = AxisX ^ AxisY;
+
+		// Make sure we have a valid normal (Axes were not coplanar).
+		if (PlaneNormal.SizeSquared() > SMALL_NUMBER)
+		{
+			return PlaneNormal.GetUnsafeNormal();
+		}
+	}
+
+	// All links are co-planar?
+	// すでにのびきって一直線になっているとこうなる
+	return FVector::UpVector; //(0.0f, 0.0f, 1.0f) 適当
+}
+
+void FABRIK_ForwardReach(const FVector& InTargetLocation, FIKChainPractice& IKChain)
+{
+}
+
+void FABRIK_BackwardReach(const FVector& InRootTargetLocation, FIKChainPractice& IKChain)
+{
+}
+
+void FABRIK_ApplyLinkConstraints_Forward(FIKChainPractice& IKChain, int32 LinkIndex)
+{
+}
+
+void FABRIK_ApplyLinkConstraints_Backward(FIKChainPractice& IKChain, int32 LinkIndex)
+{
+}
+}
+
 void FIKChainPractice::SolveFABRIK(const FVector& InTargetLocation, float InReachPrecision, int32 InMaxIterations)
 {
+	// Make sure precision is not too small.
+	const float ReachPrecision = FMath::Max(InReachPrecision, KINDA_SMALL_NUMBER);
+	const float PullDistributionAlpha = 0.5f; //TODO:もとのソースだとCVarだが、ここではCVarのデフォルト値を採用
+
+	const FVector RootTargetLocation = Links.Last().Location;
+
+	// Check distance between foot and foot target location
+	float Slop = FVector::Dist(Links[0].Location, InTargetLocation);
+	if (Slop > ReachPrecision) // ReachPrecisionより差分が小さくなったらFABRIK処理はしない
+	{
+		if (bEnableRotationLimit)
+		{
+			// Since we've previously aligned the foot with the IK Target, we're solving IK in 2D space on a single plane.
+			// Find Plane Normal, to use in rotation constraints.
+			// TODO:↑2D spaceの計算になるわけないだろ。ジョイントがばねみたいにねじれた構造になってる可能性は大いにある
+			// OrientLegTowardsIKはエフェクタのFKBoneのヒップからの方向をIKBoneの方向になるようにしたに過ぎない
+			// おそらくだが、FABRIKだと、それでも2D spaceに射影して考える必要があるのではなかろうか。
+			// だから固定した平面の法線方向として全ジョイントのFABRIK計算上のZ軸をさだめるのでは？
+
+			const FVector PlaneNormal = FindPlaneNormal(Links, RootTargetLocation, InTargetLocation);
+
+			for (int32 LinkIndex = 1; LinkIndex < NumLinks - 1; LinkIndex++)
+			{
+				const FIKChainLinkPractice& ChildLink = Links[LinkIndex - 1]; // エフェクタからそのひとつ上のジョイントへのリンクには手を入れない
+				// だが、そのリンクが持つLocationは子側のジョイントのロケーションなので、結局はエフェクタのひとつうえのジョイントからLinkAxisZを持たせることになる
+				FIKChainLinkPractice& CurrentLink = Links[LinkIndex];
+				const FIKChainLinkPractice& ParentLink = Links[LinkIndex + 1]; // ヒップジョイントだけの最後のリンクには手を入れない
+ 
+				const FVector ChildAxisX = (ChildLink.Location - CurrentLink.Location).GetSafeNormal();
+				const FVector ChildAxisY = PlaneNormal ^ ChildAxisX; // Z ^ X = Y
+				const FVector ParentAxisX = (ParentLink.Location - CurrentLink.Location).GetSafeNormal();
+
+				// Orient Z, so that ChildAxisY points 'up' and produces positive Sin values.
+				CurrentLink.LinkAxisZ = (ParentAxisX | ChildAxisY) > 0.0f ? PlaneNormal : -PlaneNormal; // TODO:この理屈はよくわからんな。あとの計算の都合か？
+			}
+		}
+
+		// Re-position limb to distribute pull
+		// これはたぶんFABRIK特有の調整項なのだろうが、全ジョイントにあらかじめ、エフェクタの目標への差分にアルファをかけたオフセットを加えておく
+		const FVector PullDistributionOffset = PullDistributionAlpha * (InTargetLocation - Links[0].Location) + (1.0f - PullDistributionAlpha) * (RootTargetLocation - Links.Last().Location); // 後者は0ベクトルになるに決まっている。だから結局はエフェクタの元の位置と目標位置の差にアルファをかけたものになる
+		for (int32 LinkIndex = 0; LinkIndex < NumLinks; LinkIndex++)
+		{
+			Links[LinkIndex].Location = Links[LinkIndex].Location + PullDistributionOffset;
+		}
+
+		// FABRIKループ
+		int32 IterationCount = 1;
+		const int32 MaxIterations = FMath::Max(InMaxIterations, 1);
+		// 必ず一回はFABRIK計算をやるのでdo-whileを使う
+		do
+		{
+			//TODO:実装
+		} while ((Slop > ReachPrecision) && (IterationCount++ < MaxIterations));
+
+		// Make sure our root is back at our root target.
+		// 何かの原因でヒップが元の位置からずれていたらもう一回分だけbackwardをやる
+		if (!Links.Last().Location.Equals(RootTargetLocation))
+		{
+			FABRIK_BackwardReach(RootTargetLocation, *this);
+		}
+
+		// If we reached, set target precisely
+		if (Slop <= ReachPrecision)
+		{
+			Links[0].Location = InTargetLocation;
+		}
+	}
 }
 
 void FAnimNode_LegIKPractice::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
