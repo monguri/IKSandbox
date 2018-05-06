@@ -94,6 +94,7 @@ void DoLegReachIK(FAnimLegIKDataPractice& InLegData, USkeletalMeshComponent* Ske
 	// Rotations
 	for (int32 LinkIndex = InLegData.NumBones - 2; LinkIndex >= 0; LinkIndex--) // ヒップジョイントは含めず、その一つ子からエフェクタまでループ
 	{
+		// リンク配列の方はLocationしか持たない。ジョイントのRotation差分はリンク配列のLocationから計算する
 		const FIKChainLinkPractice ParentLink = IKChain.Links[LinkIndex + 1];
 		const FIKChainLinkPractice CurrentLink = IKChain.Links[LinkIndex];
 
@@ -159,6 +160,38 @@ void FIKChainPractice::InitializeFromLegData(const FAnimLegIKDataPractice& InLeg
 }
 
 void FIKChainPractice::ReachTarget(const FVector& InTargetLocation, float InReachPrecision, int32 InMaxIterations)
+{
+	if (!bInitialized) //bInitialized変数を使ったこの判定って必要か？InitializeFromLegDataで失敗を返して、ReachTargetに来ないようにしておけばよかっただけでは
+	{
+		return;
+	}
+
+	const FVector RootLocation = Links.Last().Location;
+
+	// TwoBoneIKでもやった判定だね
+	// If we can't reach, we just go in a straight line towards the target,
+	if ((NumLinks <= 2) // ジョイントが2個しかないとき
+		|| (FVector::DistSquared(RootLocation, InTargetLocation) >= FMath::Square(GetMaximumReach()))) // ジョイントを伸ばし切ってもターゲットに届かないとき
+	{
+		// 伸ばしきったポーズにする
+		const FVector Direction = (InTargetLocation - RootLocation).GetSafeNormal();
+		OrientAllLinksToDirection(Direction);
+	}
+	else
+	{
+		SolveFABRIK(InTargetLocation, InReachPrecision, InMaxIterations);
+	}
+}
+
+void FIKChainPractice::OrientAllLinksToDirection(const FVector& InDirection)
+{
+	for (int32 Index = Links.Num() - 2; Index >= 0; Index--) // ヒップジョイントは含めず、その一つ子からエフェクタまでループ
+	{
+		Links[Index].Location = Links[Index + 1].Location + InDirection * Links[Index].Length;
+	}
+}
+
+void FIKChainPractice::SolveFABRIK(const FVector& InTargetLocation, float InReachPrecision, int32 InMaxIterations)
 {
 }
 

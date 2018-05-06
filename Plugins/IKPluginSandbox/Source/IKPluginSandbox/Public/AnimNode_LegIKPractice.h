@@ -118,6 +118,15 @@ public:
 
 	void InitializeFromLegData(const FAnimLegIKDataPractice& InLegData, USkeletalMeshComponent* InSkelMeshComp);
 	void ReachTarget(const FVector& InTargetLocation, float InReachPrecision, int32 InMaxIterations);
+
+	float GetMaximumReach() const
+	{
+		return MaximumReach;
+	}
+
+private:
+	void OrientAllLinksToDirection(const FVector& InDirection);
+	void SolveFABRIK(const FVector& InTargetLocation, float InReachPrecision, int32 InMaxIterations);
 };
 
 USTRUCT(BlueprintInternalUseOnly)
