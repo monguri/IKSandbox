@@ -219,10 +219,70 @@ FVector FindPlaneNormal(const TArray<FIKChainLinkPractice>& Links, const FVector
 
 void FABRIK_ForwardReach(const FVector& InTargetLocation, FIKChainPractice& IKChain)
 {
+	//TODO:まずは追加機能は除いてアルゴリズムのもっとも基本部分のみ実装する
+	// Move end effector towards target
+	// If we are compressing the chain, limit displacement.
+	// Due to how FABRIK works, if we push the target past the parent's joint, we flip the bone.
+	{
+		FVector EndEffectorToTarget = InTargetLocation - IKChain.Links[0].Location;
+
+		FVector EndEffectorToTargetDir;
+		float EndEffectorToTargetSize;
+		EndEffectorToTarget.ToDirectionAndLength(EndEffectorToTargetDir, EndEffectorToTargetSize); //便利な関数があるんだなー
+
+		float Displacement = EndEffectorToTargetSize;
+		// もっとも単純なのは、エフェクタをそのまま目標位置にもっていくこと。IKChain.Links[0].Location = InTargetLocation;
+		// もとのソースは、理由は不明だが、親のジョイント位置を考慮したり、移動値にパーセンテージを入れたりしている
+		// TODO:それらの処理は後で書く
+		IKChain.Links[0].Location += Displacement * EndEffectorToTargetDir;
+	}
+
+	// "Forward Reaching" stage - adjust bones from end effector.
+	for (int32 LinkIndex = 1; LinkIndex < IKChain.Links.Num(); LinkIndex++)
+	{
+		FIKChainLinkPractice& ChildLink = IKChain.Links[LinkIndex - 1];
+		FIKChainLinkPractice& CurrentLink = IKChain.Links[LinkIndex];
+
+		// リンクの方向は変えずに、リンクの長さを本来の長さに伸縮することを、エフェクタからヒップまでリンクをさかのぼって繰り返す
+		CurrentLink.Location = ChildLink.Location + (CurrentLink.Location - ChildLink.Location).GetSafeNormal() * CurrentLink.Length;
+		// 最終的にヒップの位置はもとの位置からずれるが、それは次にBackwardの処理で修正する
+
+		//TODO: bEnableRotationLimit==trueのときの処理は後で書く
+	}
 }
 
 void FABRIK_BackwardReach(const FVector& InRootTargetLocation, FIKChainPractice& IKChain)
 {
+	//TODO:実装
+	// Move Root back towards RootTarget
+	// If we are compressing the chain, limit displacement.
+	// Due to how FABRIK works, if we push the target past the parent's joint, we flip the bone.
+	{
+		FVector RootToRootTarget = InRootTargetLocation - IKChain.Links.Last().Location;
+
+		FVector RootToRoootTargetDir;
+		float RootToRoootTargetSize;
+		RootToRootTarget.ToDirectionAndLength(RootToRoootTargetDir, RootToRoootTargetSize); //便利な関数があるんだなー
+
+		float Displacement = RootToRoootTargetSize;
+		// もっとも単純なのは、ヒップをそのまま目標位置（もとの位置）にもっていくこと。IKChain.Links.Last().Location = InRootTargetLocation;
+		// もとのソースは、理由は不明だが、子のジョイント位置を考慮したり、移動値にパーセンテージを入れたりしている
+		// TODO:それらの処理は後で書く
+		IKChain.Links.Last().Location += Displacement * RootToRoootTargetDir;
+	}
+
+	// "Backward Reaching" stage - adjust bones from root.
+	for (int32 LinkIndex = IKChain.Links.Num() - 1; LinkIndex >= 1; LinkIndex--)
+	{
+		FIKChainLinkPractice& CurrentLink = IKChain.Links[LinkIndex];
+		FIKChainLinkPractice& ChildLink = IKChain.Links[LinkIndex - 1];
+
+		// リンクの方向は変えずに、リンクの長さを本来の長さに伸縮することを、ヒップからヒップまでリンクをさかのぼって繰り返す
+		ChildLink.Location = CurrentLink.Location + (ChildLink.Location - CurrentLink.Location).GetSafeNormal() * ChildLink.Length;
+		// 最終的にエフェクタの位置は目標位置からずれるが、それは次にForwardの処理で修正する
+
+		//TODO: bEnableRotationLimit==trueのときの処理は後で書く
+	}
 }
 
 void FABRIK_ApplyLinkConstraints_Forward(FIKChainPractice& IKChain, int32 LinkIndex)
@@ -287,7 +347,40 @@ void FIKChainPractice::SolveFABRIK(const FVector& InTargetLocation, float InReac
 		// 必ず一回はFABRIK計算をやるのでdo-whileを使う
 		do
 		{
-			//TODO:実装
+			const float PreviousSlop = Slop;
+
+			if (Slop > 1.0f) //TODO:1.0fと比較してるのがどういうことかが不明だ。。。
+			{
+				// フォワードとバックワード計算の結果の中間をとる
+				//TODO:中間をとるアルゴリズムのオプションなんてあったんだ。。。どういう効果があるんだろう。収束が早くなったり？
+				FIKChainPractice ForwardPull = *this;
+				FABRIK_ForwardReach(InTargetLocation, ForwardPull);
+
+				FIKChainPractice BackwardPull = *this;
+				FABRIK_BackwardReach(InTargetLocation, BackwardPull);
+
+				// Average pulls
+				for (int32 LinkIndex = 0; LinkIndex < NumLinks; LinkIndex++)
+				{
+					Links[LinkIndex].Location = 0.5f * (ForwardPull.Links[LinkIndex].Location + BackwardPull.Links[LinkIndex].Location);
+				}
+			}
+			else
+			{
+				// フォワードとバックワード計算の両方を続けて適用する
+				FABRIK_ForwardReach(InTargetLocation, *this);
+				FABRIK_BackwardReach(InTargetLocation, *this);
+			}
+
+			// Slopは初期値と違ってヒップも動かすのでヒップの差分距離も加算する
+			Slop = FVector::Dist(Links[0].Location, InTargetLocation) + FVector::Dist(Links.Last().Location, RootTargetLocation);
+
+			// Abort if we're not getting closer and enter a deadlock.
+			//TODO:FABRIKはループの途中過程で距離がより離れることがないんだね
+			if (Slop > PreviousSlop)
+			{
+				break;
+			}
 		} while ((Slop > ReachPrecision) && (IterationCount++ < MaxIterations));
 
 		// Make sure our root is back at our root target.
