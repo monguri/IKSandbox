@@ -12,6 +12,22 @@ struct IKPLUGINSANDBOX_API FAnimNode_CCDIK : public FAnimNode_SkeletalControlBas
 {
 	GENERATED_USTRUCT_BODY()
 
+	/** Name of ik start joint. **/
+	UPROPERTY(EditAnywhere, Category=IK)
+	FBoneReference IKRootJoint;
+
+	/** Name of ik effector joint. **/
+	UPROPERTY(EditAnywhere, Category=IK)
+	FBoneReference EffectorJoint;
+
+	/** Effector Target Location. Component space. **/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=IK, meta=(PinShownByDefault))
+	FVector EffectorLocation;
+
+	/** The number of iteration. **/
+	UPROPERTY(EditAnywhere, Category=IK)
+	uint32 NumIteration;
+
 	FAnimNode_CCDIK();
 
 public:

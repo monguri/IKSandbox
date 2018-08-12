@@ -15,7 +15,23 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 
 bool FAnimNode_CCDIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
 {
-	return true;
+	if (!IKRootJoint.IsValidToEvaluate(RequiredBones))
+	{
+		return false;
+	}
+
+	if (!EffectorJoint.IsValidToEvaluate(RequiredBones))
+	{
+		return false;
+	}
+
+	FCompactPoseBoneIndex ParentIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
+	while (ParentIndex != INDEX_NONE || ParentIndex != IKRootJoint.BoneIndex)
+	{
+		ParentIndex = RequiredBones.GetParentBoneIndex(ParentIndex);
+	}
+
+	return (ParentIndex == IKRootJoint.BoneIndex);
 }
 
 void FAnimNode_CCDIK::InitializeBoneReferences(const FBoneContainer& RequiredBones)
