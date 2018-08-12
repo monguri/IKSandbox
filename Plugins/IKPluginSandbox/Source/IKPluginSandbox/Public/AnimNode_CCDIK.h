@@ -22,7 +22,7 @@ struct IKPLUGINSANDBOX_API FAnimNode_CCDIK : public FAnimNode_SkeletalControlBas
 
 	/** Effector Target Location. Component space. **/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=IK, meta=(PinShownByDefault))
-	FVector EffectorLocation;
+	FVector EffectorTargetLocation;
 
 	/** The number of iteration. **/
 	UPROPERTY(EditAnywhere, Category=IK)
