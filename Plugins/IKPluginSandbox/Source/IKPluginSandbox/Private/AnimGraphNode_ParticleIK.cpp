@@ -15,7 +15,7 @@ UAnimGraphNode_ParticleIK::UAnimGraphNode_ParticleIK(const FObjectInitializer& O
 
 FText UAnimGraphNode_ParticleIK::GetControllerDescription() const
 {
-	return LOCTEXT("ParticleIKNode", "CCD-IK");
+	return LOCTEXT("ParticleIKNode", "Particle-IK");
 }
 
 FText UAnimGraphNode_ParticleIK::GetTooltipText() const

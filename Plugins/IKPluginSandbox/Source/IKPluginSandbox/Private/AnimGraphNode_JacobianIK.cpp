@@ -15,7 +15,7 @@ UAnimGraphNode_JacobianIK::UAnimGraphNode_JacobianIK(const FObjectInitializer& O
 
 FText UAnimGraphNode_JacobianIK::GetControllerDescription() const
 {
-	return LOCTEXT("JacobianIKNode", "CCD-IK");
+	return LOCTEXT("JacobianIKNode", "Jacobian-IK");
 }
 
 FText UAnimGraphNode_JacobianIK::GetTooltipText() const
