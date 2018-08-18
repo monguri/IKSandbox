@@ -4,7 +4,7 @@
 #include "Animation/AnimInstanceProxy.h"
 
 FAnimNode_CCDIK::FAnimNode_CCDIK()
-	: EffectorLocation(0.0f, 0.0f, 0.0f)
+	: EffectorTargetLocation(0.0f, 0.0f, 0.0f)
 	, NumIteration(10)
 {
 }
@@ -32,11 +32,11 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 
 			const FVector& ParentLocation = Output.Pose.GetComponentSpaceTransform(ParentIndex).GetLocation();
 
-			FVector& ParentToEffectorDirection = EffectorLocation - ParentLocation;
+			FVector ParentToEffectorDirection = EffectorLocation - ParentLocation;
 			bool Success = ParentToEffectorDirection.Normalize();
 			check(Success); // Parent‚ÆEffector‚ÌˆÊ’u‚ªˆê’v‚µ‚½‚Æ‚«‚ÍNormalize‚ª‚Å‚«‚È‚­‚È‚é
 
-			FVector& ParentToEffectorTargetDirection = EffectorTargetLocation - ParentLocation;
+			FVector ParentToEffectorTargetDirection = EffectorTargetLocation - ParentLocation;
 			Success = ParentToEffectorTargetDirection.Normalize();
 			check(Success) // Parent‚ÆEffectorTarget‚ÌˆÊ’u‚ªˆê’v‚µ‚½‚Æ‚«‚ÍNormalize‚ª‚Å‚«‚È‚­‚È‚é;
 
