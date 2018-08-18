@@ -11,8 +11,18 @@ FAnimNode_CCDIK::FAnimNode_CCDIK()
 
 void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
 {
+	check(Output.AnimInstanceProxy->GetSkelMeshComponent());
+	check(OutBoneTransforms.Num() == 0);
+
 	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
 
+	// ワークデータのRotationの初期化
+	for (TPair<int32, FQuat>& WorkData  : IKJointWorkDatas)
+	{
+		WorkData.Value = Output.Pose.GetComponentSpaceTransform(FCompactPoseBoneIndex(WorkData.Key)).GetRotation();
+	}
+
+	// CCDIKのメインアルゴリズム
 	for (uint32 i = 0; i < NumIteration; ++i)
 	{
 		FCompactPoseBoneIndex EffectorIndex = EffectorJoint.GetCompactPoseIndex(BoneContainer);
@@ -30,21 +40,15 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 				break;
 			}
 
+			// CCDの各ジョイントでの回転角調整
 			const FVector& ParentLocation = Output.Pose.GetComponentSpaceTransform(ParentIndex).GetLocation();
 
-			FVector ParentToEffectorDirection = EffectorLocation - ParentLocation;
-			bool Success = ParentToEffectorDirection.Normalize();
-			check(Success); // ParentとEffectorの位置が一致したときはNormalizeができなくなる
+			const FVector& ParentToEffectorDirection = EffectorLocation - ParentLocation;
+			const FVector& ParentToEffectorTargetDirection = EffectorTargetLocation - ParentLocation;
 
-			FVector ParentToEffectorTargetDirection = EffectorTargetLocation - ParentLocation;
-			Success = ParentToEffectorTargetDirection.Normalize();
-			check(Success) // ParentとEffectorTargetの位置が一致したときはNormalizeができなくなる;
+			const FQuat& DiffRotation = FQuat::FindBetweenVectors(ParentToEffectorDirection, ParentToEffectorTargetDirection);
 
-			const FQuat& DiffRotation = FQuat::FindBetweenNormals(ParentToEffectorDirection, ParentToEffectorTargetDirection);
-
-			// TODO:ジョイントに回転を加える !!!次はここから！
-
-			ParentIndex = BoneContainer.GetParentBoneIndex(ParentIndex);
+			IKJointWorkDatas[ParentIndex.GetInt()] *= DiffRotation;
 		}
 
 		if (FinishIteration)
@@ -54,9 +58,14 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 		}
 	}
 
-
-	check(Output.AnimInstanceProxy->GetSkelMeshComponent());
-	check(OutBoneTransforms.Num() == 0);
+	for (TPair<int32, FQuat>& WorkData  : IKJointWorkDatas)
+	{
+		FTransform Transform = Output.Pose.GetComponentSpaceTransform(FCompactPoseBoneIndex(WorkData.Key));
+		Transform.SetRotation(WorkData.Value);
+		OutBoneTransforms.Add(FBoneTransform(FCompactPoseBoneIndex(WorkData.Key), Transform));
+	}
+	// 配列がボーンインデックスの降順に並んでるので昇順に直す
+	OutBoneTransforms.Sort(FCompareBoneTransformIndex());
 }
 
 bool FAnimNode_CCDIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
@@ -77,9 +86,21 @@ bool FAnimNode_CCDIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneCo
 		ParentIndex = RequiredBones.GetParentBoneIndex(ParentIndex);
 	}
 
-	return (ParentIndex == IKRootJoint.BoneIndex);
+	if (ParentIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	return (IKJointWorkDatas.Num() > 0); // InitializeBoneReferencesは確かコンパイル時に呼ばれるけどこっちは実行時に呼ばれる
 }
 
 void FAnimNode_CCDIK::InitializeBoneReferences(const FBoneContainer& RequiredBones)
 {
+	FCompactPoseBoneIndex ParentIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
+	while (ParentIndex != INDEX_NONE || ParentIndex != IKRootJoint.BoneIndex)
+	{
+		IKJointWorkDatas.Add(ParentIndex.GetInt(), FQuat::Identity);
+
+		ParentIndex = RequiredBones.GetParentBoneIndex(ParentIndex);
+	}
 }
