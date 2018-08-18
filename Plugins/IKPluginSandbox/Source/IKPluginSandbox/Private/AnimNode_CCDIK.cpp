@@ -96,6 +96,9 @@ bool FAnimNode_CCDIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneCo
 
 void FAnimNode_CCDIK::InitializeBoneReferences(const FBoneContainer& RequiredBones)
 {
+	IKRootJoint.Initialize(RequiredBones);
+	EffectorJoint.Initialize(RequiredBones);
+
 	FCompactPoseBoneIndex ParentIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
 	while (ParentIndex != INDEX_NONE || ParentIndex != IKRootJoint.BoneIndex)
 	{
