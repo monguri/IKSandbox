@@ -32,9 +32,9 @@ bool RotateLegByQuat(const FQuat& InDeltaRotation, FAnimLegIKDataPractice& InLeg
 		// Rotate Leg so it is aligned with IK Target
 		for (FTransform LegBoneTransform : InLegData.FKLegBoneTransforms)
 		{
+			//HipからEffectorへの全ジョイントのコンポーネント座標でのRotationとTranslationを、Hipでの回転によって修正する
 			LegBoneTransform.SetRotation(InDeltaRotation * LegBoneTransform.GetRotation());
 
-			//TODO:Rotationをセットしたのに、それとは別にロケーションのセットがいるのか？コンポーネント座標だから？
 			const FVector BoneLocation = LegBoneTransform.GetLocation();
 			LegBoneTransform.SetLocation(HipLocation + InDeltaRotation.RotateVector(BoneLocation - HipLocation));
 		}
