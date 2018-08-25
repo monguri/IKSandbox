@@ -47,10 +47,10 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 			}
 
 			// CCD‚ÌŠeƒWƒ‡ƒCƒ“ƒg‚Å‚Ì‰ñ“]C³‚ÌŒvŽZ
-			const FVector& IKJointLocation = IKJointWorkDatas[i].Transform.GetLocation();
+			const FVector& IKJointCurrentLocation = IKJointWorkDatas[i].Transform.GetLocation();
 
-			const FVector& IKJointToEffectorDirection = EffectorLocation - IKJointLocation;
-			const FVector& IKJointToEffectorTargetDirection = EffectorTargetLocation - IKJointLocation;
+			const FVector& IKJointToEffectorDirection = EffectorLocation - IKJointCurrentLocation;
+			const FVector& IKJointToEffectorTargetDirection = EffectorTargetLocation - IKJointCurrentLocation;
 
 			const FQuat& DiffRotation = FQuat::FindBetweenVectors(IKJointToEffectorDirection, IKJointToEffectorTargetDirection);
 
@@ -58,7 +58,7 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 			for (int32 j = i - 1; j >= 0; --j)
 			{
 				IKJointWorkDatas[j].Transform.SetRotation(DiffRotation * IKJointWorkDatas[j].Transform.GetRotation());
-				IKJointWorkDatas[j].Transform.SetLocation(IKJointLocation + DiffRotation * (IKJointWorkDatas[j].Transform.GetLocation() - IKJointLocation));
+				IKJointWorkDatas[j].Transform.SetLocation(IKJointCurrentLocation + DiffRotation * (IKJointWorkDatas[j].Transform.GetLocation() - IKJointCurrentLocation));
 			}
 		}
 
@@ -73,20 +73,6 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 
 	for (int32 i = 0; i < IKJointWorkDatas.Num(); ++i)
 	{
-		//const FCompactPoseBoneIndex IKJointIndex = FCompactPoseBoneIndex(WorkData.Key);
-		//// If we have a parent, concatenate the transform, otherwise just take the new transform
-		//const FCompactPoseBoneIndex ParentIndex = Output.Pose.GetPose().GetParentBoneIndex(IKJointIndex);
-
-		//if (ParentIndex != INDEX_NONE)
-		//{
-		//	const FTransform& ParentTM = Output.Pose.GetComponentSpaceTransform(ParentIndex);
-
-		//	OutBoneTransforms.Add(FBoneTransform(IKJointIndex, WorkData.Value * ParentTM));
-		//}
-		//else
-		//{
-		//	OutBoneTransforms.Add(FBoneTransform(IKJointIndex, WorkData.Value));
-		//}
 		OutBoneTransforms.Add(FBoneTransform(IKJointWorkDatas[i].BoneIndex, IKJointWorkDatas[i].Transform));
 	}
 
