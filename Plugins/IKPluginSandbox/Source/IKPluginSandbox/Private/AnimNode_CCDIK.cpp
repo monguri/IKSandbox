@@ -16,23 +16,29 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 
 	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
 
-	// ワークデータのRotationの初期化
-	for (TPair<int32, FQuat>& WorkData  : IKJointWorkDatas)
+	// TODO:そもそもIKの解があるかの確認が毎フレーム必要
+
+	// ワークデータのTransformの初期化
+	for (IKJointWorkData& WorkData  : IKJointWorkDatas)
 	{
-		WorkData.Value = Output.Pose.GetComponentSpaceTransform(FCompactPoseBoneIndex(WorkData.Key)).GetRotation();
+		//WorkData.Transform = Output.Pose.GetLocalSpaceTransform(WorkData.BoneIndex);
+		WorkData.Transform = Output.Pose.GetComponentSpaceTransform(WorkData.BoneIndex);
 	}
 
-	// CCDIKのメインアルゴリズム
-	for (uint32 i = 0; i < NumIteration; ++i)
-	{
-		FCompactPoseBoneIndex EffectorIndex = EffectorJoint.GetCompactPoseIndex(BoneContainer);
-		bool FinishIteration = false;
 
-		for (FCompactPoseBoneIndex ParentIndex = BoneContainer.GetParentBoneIndex(EffectorIndex);
-			ParentIndex != IKRootJoint.BoneIndex;
-			ParentIndex = BoneContainer.GetParentBoneIndex(ParentIndex))
+	// 毎イテレーション、エフェクタの直近の親ジョイントからIKRootJointに指定したジョイントまでループする
+	FCompactPoseBoneIndex IKRootJointIndex = IKRootJoint.GetCompactPoseIndex(BoneContainer);
+	//FCompactPoseBoneIndex IKRootJointParentIndex = BoneContainer.GetParentBoneIndex(IKRootJointIndex);
+	const FVector& IKRootJointLocation = Output.Pose.GetComponentSpaceTransform(IKRootJointIndex).GetLocation();
+
+	// CCDIKのメインアルゴリズム
+	uint32 iterCount = 0;
+	for (; iterCount < NumIteration; ++iterCount)
+	{
+		bool FinishIteration = false;
+		for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i) // Effectorの一つ親のジョイントから、IK処理のルートに設定したジョイントまでループする
 		{
-			const FVector& EffectorLocation = Output.Pose.GetComponentSpaceTransform(EffectorIndex).GetLocation();
+			const FVector& EffectorLocation = IKJointWorkDatas[0].Transform.GetLocation();
 			if ((EffectorLocation - EffectorTargetLocation).Size() < SMALL_NUMBER)
 			{
 				// エフェクタの現在位置と目標位置が十分小さくなったらイテレーション途中でも終了
@@ -40,15 +46,20 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 				break;
 			}
 
-			// CCDの各ジョイントでの回転角調整
-			const FVector& ParentLocation = Output.Pose.GetComponentSpaceTransform(ParentIndex).GetLocation();
+			// CCDの各ジョイントでの回転修正の計算
+			const FVector& IKJointLocation = IKJointWorkDatas[i].Transform.GetLocation();
 
-			const FVector& ParentToEffectorDirection = EffectorLocation - ParentLocation;
-			const FVector& ParentToEffectorTargetDirection = EffectorTargetLocation - ParentLocation;
+			const FVector& IKJointToEffectorDirection = EffectorLocation - IKJointLocation;
+			const FVector& IKJointToEffectorTargetDirection = EffectorTargetLocation - IKJointLocation;
 
-			const FQuat& DiffRotation = FQuat::FindBetweenVectors(ParentToEffectorDirection, ParentToEffectorTargetDirection);
+			const FQuat& DiffRotation = FQuat::FindBetweenVectors(IKJointToEffectorDirection, IKJointToEffectorTargetDirection);
 
-			IKJointWorkDatas[ParentIndex.GetInt()] *= DiffRotation;
+			// 回転修正をEffectorまでのすべての子のコンポーネント座標でのRotationとLocationに反映させる
+			for (int32 j = i - 1; j >= 0; --j)
+			{
+				IKJointWorkDatas[j].Transform.SetRotation(DiffRotation * IKJointWorkDatas[j].Transform.GetRotation());
+				IKJointWorkDatas[j].Transform.SetLocation(IKJointLocation + DiffRotation * (IKJointWorkDatas[j].Transform.GetLocation() - IKJointLocation));
+			}
 		}
 
 		if (FinishIteration)
@@ -58,12 +69,27 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 		}
 	}
 
-	for (TPair<int32, FQuat>& WorkData  : IKJointWorkDatas)
+	UE_CLOG(iterCount >= NumIteration, LogAnimation, Warning, TEXT("Did not converge at NumIteration set."));
+
+	for (int32 i = 0; i < IKJointWorkDatas.Num(); ++i)
 	{
-		FTransform Transform = Output.Pose.GetComponentSpaceTransform(FCompactPoseBoneIndex(WorkData.Key));
-		Transform.SetRotation(WorkData.Value);
-		OutBoneTransforms.Add(FBoneTransform(FCompactPoseBoneIndex(WorkData.Key), Transform));
+		//const FCompactPoseBoneIndex IKJointIndex = FCompactPoseBoneIndex(WorkData.Key);
+		//// If we have a parent, concatenate the transform, otherwise just take the new transform
+		//const FCompactPoseBoneIndex ParentIndex = Output.Pose.GetPose().GetParentBoneIndex(IKJointIndex);
+
+		//if (ParentIndex != INDEX_NONE)
+		//{
+		//	const FTransform& ParentTM = Output.Pose.GetComponentSpaceTransform(ParentIndex);
+
+		//	OutBoneTransforms.Add(FBoneTransform(IKJointIndex, WorkData.Value * ParentTM));
+		//}
+		//else
+		//{
+		//	OutBoneTransforms.Add(FBoneTransform(IKJointIndex, WorkData.Value));
+		//}
+		OutBoneTransforms.Add(FBoneTransform(IKJointWorkDatas[i].BoneIndex, IKJointWorkDatas[i].Transform));
 	}
+
 	// 配列がボーンインデックスの降順に並んでるので昇順に直す
 	OutBoneTransforms.Sort(FCompareBoneTransformIndex());
 }
@@ -81,13 +107,14 @@ bool FAnimNode_CCDIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneCo
 	}
 
 	FCompactPoseBoneIndex ParentIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
-	while (ParentIndex != INDEX_NONE || ParentIndex != IKRootJoint.BoneIndex)
+	while (ParentIndex != INDEX_NONE && ParentIndex != IKRootJoint.BoneIndex)
 	{
 		ParentIndex = RequiredBones.GetParentBoneIndex(ParentIndex);
 	}
 
 	if (ParentIndex == INDEX_NONE)
 	{
+		// IKRootJointとEffectorJointが先祖子孫関係になってない
 		return false;
 	}
 
@@ -99,11 +126,18 @@ void FAnimNode_CCDIK::InitializeBoneReferences(const FBoneContainer& RequiredBon
 	IKRootJoint.Initialize(RequiredBones);
 	EffectorJoint.Initialize(RequiredBones);
 
-	FCompactPoseBoneIndex ParentIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
-	while (ParentIndex != INDEX_NONE || ParentIndex != IKRootJoint.BoneIndex)
-	{
-		IKJointWorkDatas.Add(ParentIndex.GetInt(), FQuat::Identity);
+	// EffectorJointから、IKRootJointまで、IKRootJointにぶつからなければルートジョイントまでワークデータを持たせる
+	FCompactPoseBoneIndex IKJointIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
 
-		ParentIndex = RequiredBones.GetParentBoneIndex(ParentIndex);
+	while (IKJointIndex != INDEX_NONE && IKJointIndex != IKRootJoint.BoneIndex)
+	{
+		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity);
+
+		IKJointIndex = RequiredBones.GetParentBoneIndex(IKJointIndex);
+	}
+
+	if (IKJointIndex == IKRootJoint.BoneIndex)
+	{
+		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity);
 	}
 }

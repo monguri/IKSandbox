@@ -7,13 +7,14 @@
 #include "BoneControllers/AnimNode_SkeletalControlBase.h"
 #include "AnimNode_CCDIK.generated.h"
 
-//struct IKJointWorkData
-//{
-//	FCompactPoseBoneIndex BoneIndex;
-//	FQuat Rotation;
-//
-//	IKJointWorkData() : BoneIndex(INDEX_NONE), Rotation(FQuat::Identity) {}
-//};
+struct IKJointWorkData
+{
+	FCompactPoseBoneIndex BoneIndex;
+	FTransform Transform;
+
+	IKJointWorkData() : BoneIndex(INDEX_NONE), Transform(FTransform::Identity) {}
+	IKJointWorkData(FCompactPoseBoneIndex _BoneIndex, const FTransform& _Transform) : BoneIndex(_BoneIndex), Transform(_Transform) {}
+};
 
 USTRUCT(BlueprintInternalUseOnly)
 struct IKPLUGINSANDBOX_API FAnimNode_CCDIK : public FAnimNode_SkeletalControlBase
@@ -45,7 +46,7 @@ public:
 	// End of FAnimNode_SkeletalControlBase interface
 
 private:
-	TMap<int32, FQuat> IKJointWorkDatas;
+	TArray<IKJointWorkData> IKJointWorkDatas;
 
 	// FAnimNode_SkeletalControlBase interface
 	virtual void InitializeBoneReferences(const FBoneContainer& RequiredBones) override;
