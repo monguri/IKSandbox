@@ -6,6 +6,7 @@
 FAnimNode_CCDIK::FAnimNode_CCDIK()
 	: EffectorTargetLocation(0.0f, 0.0f, 0.0f)
 	, MaxIteration(10)
+	, Precision(SMALL_NUMBER)
 {
 }
 
@@ -33,7 +34,7 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 		for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
 		{
 			const FVector& EffectorLocation = IKJointWorkDatas[0].Transform.GetLocation();
-			if ((EffectorLocation - EffectorTargetLocation).Size() < SMALL_NUMBER)
+			if ((EffectorLocation - EffectorTargetLocation).Size() < Precision)
 			{
 				// エフェクタの現在位置と目標位置が十分小さくなったらイテレーション途中でも終了
 				FinishIteration = true;

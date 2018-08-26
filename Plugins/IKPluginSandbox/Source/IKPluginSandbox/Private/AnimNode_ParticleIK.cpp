@@ -7,6 +7,7 @@ FAnimNode_ParticleIK::FAnimNode_ParticleIK()
 	: EffectorTargetLocation(0.0f, 0.0f, 0.0f)
 	, MaxIteration(10)
 	, IKRootJointOriginalLocation(0.0f, 0.0f, 0.0f)
+	, Precision(SMALL_NUMBER)
 {
 }
 
@@ -65,7 +66,7 @@ void FAnimNode_ParticleIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 		// 収束判定
 		const FVector& EffectorLocation = IKJointWorkDatas[0].Transform.GetLocation();
-		if ((EffectorLocation - EffectorTargetLocation).Size() < SMALL_NUMBER)
+		if ((EffectorLocation - EffectorTargetLocation).Size() < Precision)
 		{
 			// エフェクタの現在位置と目標位置が十分小さくなった上で、各ジョイント間の長さがオリジナルの長さとほっぼ一致していたらイテレーション途中でも終了
 			// ジョイントの長さのずれにこだわらないならエフェクタ位置だけで収束判定をしてもいいが
@@ -74,7 +75,7 @@ void FAnimNode_ParticleIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i) // Effectorの一つ親のジョイントから、IK処理のルートに設定したジョイントまでループする
 			{
 				const FVector& ChildToThisJointDirection = IKJointWorkDatas[i].Transform.GetLocation() - IKJointWorkDatas[i - 1].Transform.GetLocation();
-				if (FMath::Abs(ChildToThisJointDirection.Size() - IKJointWorkDatas[i].OriginalJointLengthToChild) > SMALL_NUMBER)
+				if (FMath::Abs(ChildToThisJointDirection.Size() - IKJointWorkDatas[i].OriginalJointLengthToChild) > Precision)
 				{
 					FinishIteration = false;
 					break;

@@ -28,6 +28,10 @@ struct IKPLUGINSANDBOX_API FAnimNode_CCDIK : public FAnimNode_SkeletalControlBas
 	UPROPERTY(EditAnywhere, Category=IK)
 	uint32 MaxIteration;
 
+	/** Tolerance for IK Target, in unreal units. */
+	UPROPERTY(EditAnywhere, Category=IK)
+	float Precision;
+
 	FAnimNode_CCDIK();
 
 public:

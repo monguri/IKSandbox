@@ -28,6 +28,10 @@ struct IKPLUGINSANDBOX_API FAnimNode_ParticleIK : public FAnimNode_SkeletalContr
 	UPROPERTY(EditAnywhere, Category=IK)
 	uint32 MaxIteration;
 
+	/** Tolerance for IK Target and IK joint length, in unreal units. */
+	UPROPERTY(EditAnywhere, Category=IK)
+	float Precision;
+
 	FAnimNode_ParticleIK();
 
 public:
