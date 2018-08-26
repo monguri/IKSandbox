@@ -21,13 +21,13 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 	// TODO:各IKノードと共通化しよう
 	// そもそもジョイントの長さ的にIKの解に到達しうるかの確認
 	float EffectorToIKRootLength = (IKJointWorkDatas.Last().Transform.GetLocation() - IKJointWorkDatas[0].Transform.GetLocation()).Size();
-	float IKJointTotalLenth = 0; // アニメーションにScaleがないなら、一度だけ計算してキャッシュしておけばよいが、今は毎回計算する
+	float IKJointTotalLength = 0; // アニメーションにScaleがないなら、一度だけ計算してキャッシュしておけばよいが、今は毎回計算する
 	for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
 	{
-		IKJointTotalLenth += (IKJointWorkDatas[i].Transform.GetLocation() - IKJointWorkDatas[i - 1].Transform.GetLocation()).Size();
+		IKJointTotalLength += (IKJointWorkDatas[i].Transform.GetLocation() - IKJointWorkDatas[i - 1].Transform.GetLocation()).Size();
 	}
 
-	if (IKJointTotalLenth < EffectorToIKRootLength)
+	if (IKJointTotalLength < EffectorToIKRootLength)
 	{
 		UE_LOG(LogAnimation, Warning, TEXT("IK cannot reach effector target location. The total length of joints is not enough."));
 		return;
