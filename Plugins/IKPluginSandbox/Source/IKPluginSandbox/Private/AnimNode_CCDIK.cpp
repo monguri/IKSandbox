@@ -14,10 +14,24 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 {
 	check(Output.AnimInstanceProxy->GetSkelMeshComponent());
 	check(OutBoneTransforms.Num() == 0);
+	check(OutBoneTransforms.Num() == 0);
 
 	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
 
-	// TODO:そもそもIKの解があるかの確認が毎フレーム必要
+	// TODO:各IKノードと共通化しよう
+	// そもそもジョイントの長さ的にIKの解に到達しうるかの確認
+	float EffectorToIKRootLength = (IKJointWorkDatas.Last().Transform.GetLocation() - IKJointWorkDatas[0].Transform.GetLocation()).Size();
+	float IKJointTotalLenth = 0; // アニメーションにScaleがないなら、一度だけ計算してキャッシュしておけばよいが、今は毎回計算する
+	for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
+	{
+		IKJointTotalLenth += (IKJointWorkDatas[i].Transform.GetLocation() - IKJointWorkDatas[i - 1].Transform.GetLocation()).Size();
+	}
+
+	if (IKJointTotalLenth < EffectorToIKRootLength)
+	{
+		UE_LOG(LogAnimation, Warning, TEXT("IK cannot reach effector target location. The total length of joints is not enough."));
+		return;
+	}
 
 	// ワークデータのTransformの初期化
 	for (IKJointWorkData& WorkData : IKJointWorkDatas)
