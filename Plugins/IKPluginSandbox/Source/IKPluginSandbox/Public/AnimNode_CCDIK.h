@@ -7,15 +7,6 @@
 #include "BoneControllers/AnimNode_SkeletalControlBase.h"
 #include "AnimNode_CCDIK.generated.h"
 
-struct IKJointWorkData
-{
-	FCompactPoseBoneIndex BoneIndex;
-	FTransform Transform;
-
-	IKJointWorkData() : BoneIndex(INDEX_NONE), Transform(FTransform::Identity) {}
-	IKJointWorkData(FCompactPoseBoneIndex _BoneIndex, const FTransform& _Transform) : BoneIndex(_BoneIndex), Transform(_Transform) {}
-};
-
 USTRUCT(BlueprintInternalUseOnly)
 struct IKPLUGINSANDBOX_API FAnimNode_CCDIK : public FAnimNode_SkeletalControlBase
 {
@@ -35,7 +26,7 @@ struct IKPLUGINSANDBOX_API FAnimNode_CCDIK : public FAnimNode_SkeletalControlBas
 
 	/** The number of iteration. **/
 	UPROPERTY(EditAnywhere, Category=IK)
-	uint32 NumIteration;
+	uint32 MaxIteration;
 
 	FAnimNode_CCDIK();
 
@@ -46,6 +37,15 @@ public:
 	// End of FAnimNode_SkeletalControlBase interface
 
 private:
+	struct IKJointWorkData
+	{
+		FCompactPoseBoneIndex BoneIndex;
+		FTransform Transform;
+
+		IKJointWorkData() : BoneIndex(INDEX_NONE), Transform(FTransform::Identity) {}
+		IKJointWorkData(FCompactPoseBoneIndex _BoneIndex, const FTransform& _Transform) : BoneIndex(_BoneIndex), Transform(_Transform) {}
+	};
+
 	TArray<IKJointWorkData> IKJointWorkDatas;
 
 	// FAnimNode_SkeletalControlBase interface
