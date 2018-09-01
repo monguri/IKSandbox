@@ -55,6 +55,7 @@ void FAnimNode_ParticleIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 	const FVector& IKRootJointLocation = Output.Pose.GetComponentSpaceTransform(IKRootJointIndex).GetLocation();
 
 	// Particle-IKのメインアルゴリズム
+	// Particle-IKのアルゴリズムについてはComputer Graphics Gems JP 2012の8章を参照
 	uint32 iterCount = 0;
 	for (; iterCount < MaxIteration; ++iterCount)
 	{

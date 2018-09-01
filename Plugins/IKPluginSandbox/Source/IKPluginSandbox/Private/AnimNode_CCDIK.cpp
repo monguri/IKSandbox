@@ -40,6 +40,7 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 	}
 
 	// CCDIKのメインアルゴリズム
+	// CCDIKアルゴリズムについてはComputer Graphics Gems JP 2012の8章を参照
 	uint32 iterCount = 0;
 	for (; iterCount < MaxIteration; ++iterCount)
 	{
