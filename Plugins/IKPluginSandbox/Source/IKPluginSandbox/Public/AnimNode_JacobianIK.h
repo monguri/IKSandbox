@@ -12,6 +12,26 @@ struct IKPLUGINSANDBOX_API FAnimNode_JacobianIK : public FAnimNode_SkeletalContr
 {
 	GENERATED_USTRUCT_BODY()
 
+	/** Name of ik start joint. **/
+	UPROPERTY(EditAnywhere, Category=IK)
+	FBoneReference IKRootJoint;
+
+	/** Name of ik effector joint. **/
+	UPROPERTY(EditAnywhere, Category=IK)
+	FBoneReference EffectorJoint;
+
+	/** Effector Target Location. Component space. **/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=IK, meta=(PinShownByDefault))
+	FVector EffectorTargetLocation;
+
+	/** The number of iteration. **/
+	UPROPERTY(EditAnywhere, Category=IK)
+	uint32 MaxIteration;
+
+	/** Tolerance for IK Target and IK joint length, in unreal units. */
+	UPROPERTY(EditAnywhere, Category=IK)
+	float Precision;
+
 	FAnimNode_JacobianIK();
 
 public:
@@ -21,6 +41,17 @@ public:
 	// End of FAnimNode_SkeletalControlBase interface
 
 private:
+	struct IKJointWorkData
+	{
+		FCompactPoseBoneIndex BoneIndex;
+		FTransform Transform;
+
+		IKJointWorkData() : BoneIndex(INDEX_NONE), Transform(FTransform::Identity) {}
+		IKJointWorkData(FCompactPoseBoneIndex _BoneIndex, const FTransform& _Transform) : BoneIndex(_BoneIndex), Transform(_Transform) {}
+	};
+
+	TArray<IKJointWorkData> IKJointWorkDatas;
+
 	// FAnimNode_SkeletalControlBase interface
 	virtual void InitializeBoneReferences(const FBoneContainer& RequiredBones) override;
 	// End of FAnimNode_SkeletalControlBase interface
