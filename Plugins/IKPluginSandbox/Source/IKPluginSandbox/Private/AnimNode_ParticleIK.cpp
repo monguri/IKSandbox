@@ -20,11 +20,11 @@ void FAnimNode_ParticleIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 	// TODO:各IKノードと共通化しよう
 	// そもそもジョイントの長さ的にIKの解に到達しうるかの確認
-	float EffectorToIKRootLength = (IKJointWorkDatas.Last().Transform.GetLocation() - IKJointWorkDatas[0].Transform.GetLocation()).Size();
+	float EffectorToIKRootLength = (Output.Pose.GetComponentSpaceTransform(IKJointWorkDatas.Last().BoneIndex).GetLocation() - Output.Pose.GetComponentSpaceTransform(IKJointWorkDatas[0].BoneIndex).GetLocation()).Size();
 	float IKJointTotalLength = 0; // アニメーションにScaleがないなら、一度だけ計算してキャッシュしておけばよいが、今は毎回計算する
 	for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
 	{
-		IKJointTotalLength += (IKJointWorkDatas[i].Transform.GetLocation() - IKJointWorkDatas[i - 1].Transform.GetLocation()).Size();
+		IKJointTotalLength += (Output.Pose.GetComponentSpaceTransform(IKJointWorkDatas[i].BoneIndex).GetLocation() - Output.Pose.GetComponentSpaceTransform(IKJointWorkDatas[i - 1].BoneIndex).GetLocation()).Size();
 	}
 
 	if (IKJointTotalLength < EffectorToIKRootLength)

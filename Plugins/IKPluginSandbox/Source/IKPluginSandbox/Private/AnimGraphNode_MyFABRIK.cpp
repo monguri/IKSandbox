@@ -15,7 +15,7 @@ UAnimGraphNode_MyFABRIK::UAnimGraphNode_MyFABRIK(const FObjectInitializer& Objec
 
 FText UAnimGraphNode_MyFABRIK::GetControllerDescription() const
 {
-	return LOCTEXT("MyFABRIKNode", "FABRIK");
+	return LOCTEXT("My FABRIK Node", "MyFABRIK");
 }
 
 FText UAnimGraphNode_MyFABRIK::GetTooltipText() const
