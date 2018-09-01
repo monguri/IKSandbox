@@ -14,7 +14,6 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 {
 	check(Output.AnimInstanceProxy->GetSkelMeshComponent());
 	check(OutBoneTransforms.Num() == 0);
-	check(OutBoneTransforms.Num() == 0);
 
 	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
 
