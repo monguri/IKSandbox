@@ -95,7 +95,12 @@ void FAnimNode_JacobianIK::AnySizeMatrix::Set(uint8 Row, uint8 Column, float Val
 
 void FAnimNode_JacobianIK::AnySizeMatrix::ZeroClear()
 {
-	memset(Elements.GetData(), 0, NumRow * NumColumn);
+	for (int32 i = 0; i < NumRow * NumColumn; ++i)
+	{
+		Elements[i] = 0.0f;
+	}
+	// TODO:‚È‚º‚©‚¿‚á‚ñ‚Æ0ƒNƒŠƒA‚³‚ê‚È‚¢
+	//memset(Elements.GetData(), 0, NumRow * NumColumn);
 }
 
 FAnimNode_JacobianIK::FAnimNode_JacobianIK()
