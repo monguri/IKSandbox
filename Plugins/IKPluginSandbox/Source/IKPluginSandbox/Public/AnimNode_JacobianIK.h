@@ -26,7 +26,7 @@ struct IKPLUGINSANDBOX_API FAnimNode_JacobianIK : public FAnimNode_SkeletalContr
 
 	/** The number of iteration. **/
 	UPROPERTY(EditAnywhere, Category=IK)
-	uint32 MaxIteration;
+	uint32 NumIteration;
 
 	/** Tolerance for IK Target and IK joint length, in unreal units. */
 	UPROPERTY(EditAnywhere, Category=IK)
@@ -51,6 +51,23 @@ private:
 	};
 
 	TArray<IKJointWorkData> IKJointWorkDatas;
+
+	struct AnySizeMatrix
+	{
+		AnySizeMatrix();
+		AnySizeMatrix(uint8 _NumRow, uint8 _NumColumn);
+		void Set(uint8 Row, uint8 Column, float Value);
+		void ZeroClear();
+
+		TArray<float> Elements; // 1-dimensional array for access speed.
+		uint8 NumRow;
+		uint8 NumColumn;
+	};
+
+	// Parent joint of ik root joint
+	FCompactPoseBoneIndex IKRootJointParent;
+
+	AnySizeMatrix Jacobian;
 
 	// FAnimNode_SkeletalControlBase interface
 	virtual void InitializeBoneReferences(const FBoneContainer& RequiredBones) override;
