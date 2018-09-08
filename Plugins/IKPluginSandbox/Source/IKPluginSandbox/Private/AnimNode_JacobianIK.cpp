@@ -87,6 +87,11 @@ FAnimNode_JacobianIK::AnySizeMatrix::AnySizeMatrix(uint8 _NumRow, uint8 _NumColu
 	NumColumn = _NumColumn;
 }
 
+float FAnimNode_JacobianIK::AnySizeMatrix::Get(uint8 Row, uint8 Column) const
+{
+	return Elements[Row * NumColumn + Column];
+}
+
 void FAnimNode_JacobianIK::AnySizeMatrix::Set(uint8 Row, uint8 Column, float Value)
 {
 	// TODO:operator[][]の演算子オーバーライドは作れないかな？
@@ -95,12 +100,68 @@ void FAnimNode_JacobianIK::AnySizeMatrix::Set(uint8 Row, uint8 Column, float Val
 
 void FAnimNode_JacobianIK::AnySizeMatrix::ZeroClear()
 {
-	for (int32 i = 0; i < NumRow * NumColumn; ++i)
+	FMemory::Memzero(Elements.GetData(), sizeof(float) * NumRow * NumColumn);
+}
+
+void FAnimNode_JacobianIK::AnySizeMatrix::Transpose(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix)
+{
+	for (int32 Row = 0; Row < InMatrix.NumRow; ++Row)
 	{
-		Elements[i] = 0.0f;
+		for (int32 Column = 0; Column < InMatrix.NumColumn; ++Column)
+		{
+			OutMatrix.Set(Column, Row, InMatrix.Get(Row, Column));
+		}
 	}
-	// TODO:なぜかちゃんと0クリアされない
-	//memset(Elements.GetData(), 0, NumRow * NumColumn);
+}
+
+void FAnimNode_JacobianIK::AnySizeMatrix::Multiply(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult)
+{
+	check(A.NumColumn == B.NumRow);
+	check(OutResult.NumRow == A.NumRow);
+	check(OutResult.NumColumn == B.NumColumn);
+
+	for (int32 Row = 0; Row < OutResult.NumRow; ++Row)
+	{
+		for (int32 Column = 0; Column < OutResult.NumColumn; ++Column)
+		{
+			OutResult.Set(Row, Column, 0);
+
+			for (int32 i = 0; i < A.NumColumn; ++i)
+			{
+				OutResult.Set(Row, Column, OutResult.Get(Row, Column) + A.Get(Row, i) * B.Get(i, Column));
+			}
+		}
+	}
+}
+
+float FAnimNode_JacobianIK::AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix)
+{
+	float Determinant =
+		  InMatrix.Get(0, 0) * InMatrix.Get(1, 1) * InMatrix.Get(2, 2)
+		+ InMatrix.Get(1, 0) * InMatrix.Get(2, 1) * InMatrix.Get(0, 2)
+		+ InMatrix.Get(2, 0) * InMatrix.Get(0, 1) * InMatrix.Get(1, 2)
+		- InMatrix.Get(0, 0) * InMatrix.Get(2, 1) * InMatrix.Get(1, 2)
+		- InMatrix.Get(2, 0) * InMatrix.Get(1, 1) * InMatrix.Get(0, 2)
+		- InMatrix.Get(1, 0) * InMatrix.Get(0, 1) * InMatrix.Get(2, 2);
+
+	if (Determinant == 0)
+	{
+		return Determinant;
+	}
+
+	OutMatrix.Set(0, 0, (InMatrix.Get(1, 1) * InMatrix.Get(2, 2) - InMatrix.Get(1, 2) * InMatrix.Get(2, 1)) / Determinant);
+	OutMatrix.Set(0, 1, (InMatrix.Get(0, 2) * InMatrix.Get(2, 1) - InMatrix.Get(0, 1) * InMatrix.Get(2, 2)) / Determinant);
+	OutMatrix.Set(0, 2, (InMatrix.Get(0, 1) * InMatrix.Get(1, 2) - InMatrix.Get(0, 2) * InMatrix.Get(1, 1)) / Determinant);
+
+	OutMatrix.Set(1, 0, (InMatrix.Get(1, 2) * InMatrix.Get(2, 0) - InMatrix.Get(1, 0) * InMatrix.Get(2, 2)) / Determinant);
+	OutMatrix.Set(1, 1, (InMatrix.Get(0, 0) * InMatrix.Get(2, 2) - InMatrix.Get(0, 2) * InMatrix.Get(2, 0)) / Determinant);
+	OutMatrix.Set(1, 2, (InMatrix.Get(0, 2) * InMatrix.Get(1, 0) - InMatrix.Get(0, 0) * InMatrix.Get(1, 2)) / Determinant);
+
+	OutMatrix.Set(2, 0, (InMatrix.Get(1, 0) * InMatrix.Get(2, 1) - InMatrix.Get(1, 1) * InMatrix.Get(2, 0)) / Determinant);
+	OutMatrix.Set(2, 1, (InMatrix.Get(0, 1) * InMatrix.Get(2, 0) - InMatrix.Get(0, 0) * InMatrix.Get(2, 1)) / Determinant);
+	OutMatrix.Set(2, 2, (InMatrix.Get(0, 0) * InMatrix.Get(1, 1) - InMatrix.Get(0, 1) * InMatrix.Get(1, 0)) / Determinant);
+
+	return Determinant;
 }
 
 FAnimNode_JacobianIK::FAnimNode_JacobianIK()
@@ -146,7 +207,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 	{
 		// Jacobianの計算
 		{
-			Jacobian.ZeroClear();
+			Jacobian.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 
 			// エフェクタの親からIKルートジョイントまでを回転の入力とするのでそれらからJacobianを作る
 			for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
@@ -211,6 +272,22 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				}
 			}
 		}
+
+		// Jacobianの疑似逆行列の計算
+		{
+			Jt.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
+			AnySizeMatrix::Transpose(Jacobian, Jt);
+
+			JtJ.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
+			AnySizeMatrix::Multiply(Jt, Jacobian, JtJ);
+
+			JtJi.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
+			AnySizeMatrix::Inverse3x3(JtJ, JtJi);
+
+			PseudoInverseJacobian.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
+			AnySizeMatrix::Multiply(JtJi, Jt, PseudoInverseJacobian);
+
+			// TODO:とりあえず関節角変位目標値τは0にしておき、計算しない
 	}
 
 	// ボーンインデックスの昇順に渡したいので逆順にループする
@@ -272,4 +349,8 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 	// ヤコビアンの行数は、目標値を設定する全エフェクタの出力変数の数なので、現在は1個だけの位置指定だけなので3
 	// ヤコビアンの列数は、IKの入力変数の数なので（ジョイント数-1）×回転の自由度3。-1なのはエフェクタの回転自由度は使わないから
 	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * AXIS_COUNT, AXIS_COUNT);
+	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
+	JtJ = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J^t * J
+	JtJi = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
+	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT); // (J^t * J)^-1 * J^t
 }

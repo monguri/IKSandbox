@@ -56,8 +56,12 @@ private:
 	{
 		AnySizeMatrix();
 		AnySizeMatrix(uint8 _NumRow, uint8 _NumColumn);
+		float Get(uint8 Row, uint8 Column) const;
 		void Set(uint8 Row, uint8 Column, float Value);
 		void ZeroClear();
+		static void Transpose(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
+		static void Multiply(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
+		static float Inverse3x3(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
 
 		TArray<float> Elements; // 1-dimensional array for access speed.
 		uint8 NumRow;
@@ -68,6 +72,10 @@ private:
 	FCompactPoseBoneIndex IKRootJointParent;
 
 	AnySizeMatrix Jacobian;
+	AnySizeMatrix Jt;
+	AnySizeMatrix JtJ;
+	AnySizeMatrix JtJi;
+	AnySizeMatrix PseudoInverseJacobian;
 
 	// FAnimNode_SkeletalControlBase interface
 	virtual void InitializeBoneReferences(const FBoneContainer& RequiredBones) override;
