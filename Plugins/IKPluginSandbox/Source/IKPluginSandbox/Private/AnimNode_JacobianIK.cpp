@@ -266,15 +266,16 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				// ジョイントのローカル行列の回転部分を微分行列に置き換えたものを求める
 
 				FMatrix LocalTranslateMatrix = FMatrix::Identity;
-				LocalTranslateMatrix.ConcatTranslation(IKJointWorkDatas[i].LocalTransform.GetTranslation());
+				LocalTranslateMatrix = LocalTranslateMatrix.ConcatTranslation(IKJointWorkDatas[i].LocalTransform.GetTranslation());
 
-				FMatrix LocalTransformMatrix[AXIS_COUNT];
-				LocalTransformMatrix[0] = LocalTranslateMatrix * (RotationDifferentialX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw));
-				LocalTransformMatrix[1] = LocalTranslateMatrix * (RotationX(LocalRotation.Roll) * RotationDifferentialY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw));
-				LocalTransformMatrix[2] = LocalTranslateMatrix * (RotationX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationDifferentialZ(LocalRotation.Yaw));
+				FMatrix LocalMatrix[AXIS_COUNT];
+				// TODO:この積の順番はあってるのか？
+				LocalMatrix[0] = LocalTranslateMatrix * (RotationDifferentialX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw));
+				LocalMatrix[1] = LocalTranslateMatrix * (RotationX(LocalRotation.Roll) * RotationDifferentialY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw));
+				LocalMatrix[2] = LocalTranslateMatrix * (RotationX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationDifferentialZ(LocalRotation.Yaw));
 
 				// ジョイントの座標系から見た現在のエフェクタ位置を求める
-				const FVector& EffectorLocationAtThisJointSpace = (IKJointWorkDatas[0].ComponentTransform * IKJointWorkDatas[i].ComponentTransform.Inverse()).TransformFVector4(FVector4(0, 0, 0, 1));
+				const FMatrix& ChildRestMatrix = (IKJointWorkDatas[0].ComponentTransform.ToMatrixWithScale() * IKJointWorkDatas[i].ComponentTransform.Inverse().ToMatrixWithScale());
 				FMatrix ParentRestMatrix;
 				if (i == IKJointWorkDatas.Num() - 1) // IKルートジョイントのとき
 				{
@@ -295,8 +296,8 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				for (int32 Axis = 0; Axis < AXIS_COUNT; ++Axis)
 				{
 					// TODO:計算が行優先になってないのでは？
-					const FVector& JacobianColumn = (LocalTransformMatrix[Axis] * ParentRestMatrix).TransformPosition(EffectorLocationAtThisJointSpace);
-					Jacobian.Set(0, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.X);	
+					const FVector& JacobianColumn = (ChildRestMatrix * LocalMatrix[Axis] * ParentRestMatrix).TransformFVector4(FVector4(0, 0, 0, 1));
+					Jacobian.Set(0, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.X);
 					Jacobian.Set(1, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.Y);	
 					Jacobian.Set(2, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.Z);	
 				}
