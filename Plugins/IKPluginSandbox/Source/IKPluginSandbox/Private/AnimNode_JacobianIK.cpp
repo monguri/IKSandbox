@@ -164,6 +164,25 @@ float FAnimNode_JacobianIK::AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMat
 	return Determinant;
 }
 
+void FAnimNode_JacobianIK::AnySizeMatrix::TransformVector(const AnySizeMatrix& InMatrix, const TArray<float>& InVector, TArray<float>& OutVector)
+{
+	check((int32)InMatrix.NumColumn == InVector.Num());
+	check((int32)InMatrix.NumRow == OutVector.Num());
+
+	for (int32 Row = 0; Row < OutVector.Num(); ++Row)
+	{
+		OutVector[Row] = 0.0f;
+	}
+
+	for (int32 Row = 0; Row < InMatrix.NumRow; ++Row)
+	{
+		for (int32 Column = 0; Column < InMatrix.NumColumn; ++Column)
+		{
+			OutVector[Row] += InMatrix.Get(Row, Column) * InVector[Column];
+		}
+	}
+}
+
 FAnimNode_JacobianIK::FAnimNode_JacobianIK()
 	: EffectorTargetLocation(0.0f, 0.0f, 0.0f)
 	, NumIteration(10)
@@ -199,6 +218,14 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 	{
 		WorkData.Transform = Output.Pose.GetComponentSpaceTransform(WorkData.BoneIndex);
 	}
+
+	// ノードの入力されたエフェクタの位置から目標位置への差分ベクトル
+	const FVector& DeltaLocation = EffectorTargetLocation - Output.Pose.GetComponentSpaceTransform(IKJointWorkDatas[0].BoneIndex).GetLocation();
+	// 毎イテレーションでの位置移動
+	const FVector& IterationStep = DeltaLocation / NumIteration;
+	IterationStepPosition[0] = IterationStep.X;
+	IterationStepPosition[1] = IterationStep.Y;
+	IterationStepPosition[2] = IterationStep.Z;
 
 	// JacobianIKのメインアルゴリズム
 	// JacobianIKアルゴリズムについてはComputer Graphics Gems JP 2012の8章を参照
@@ -288,6 +315,14 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			AnySizeMatrix::Multiply(JtJi, Jt, PseudoInverseJacobian);
 
 			// TODO:とりあえず関節角変位目標値τは0にしておき、計算しない
+		}
+
+		// 回転角変位を求め、ワークデータの現在角を更新する
+		{
+			AnySizeMatrix::TransformVector(PseudoInverseJacobian, IterationStepPosition, IterationStepAngles);
+			// TODO:IKルートから順に回転角をプラスしていく
+			check(true);
+		}
 	}
 
 	// ボーンインデックスの昇順に渡したいので逆順にループする
@@ -353,4 +388,6 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 	JtJ = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J^t * J
 	JtJi = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
 	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT); // (J^t * J)^-1 * J^t
+	IterationStepPosition.SetNumZeroed(AXIS_COUNT);
+	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
 }

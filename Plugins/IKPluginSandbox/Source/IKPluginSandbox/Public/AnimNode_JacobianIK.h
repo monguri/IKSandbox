@@ -62,6 +62,7 @@ private:
 		static void Transpose(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
 		static void Multiply(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
 		static float Inverse3x3(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
+		static void TransformVector(const AnySizeMatrix& InMatrix, const TArray<float>& InVector, TArray<float>& OutVector);
 
 		TArray<float> Elements; // 1-dimensional array for access speed.
 		uint8 NumRow;
@@ -76,6 +77,8 @@ private:
 	AnySizeMatrix JtJ;
 	AnySizeMatrix JtJi;
 	AnySizeMatrix PseudoInverseJacobian;
+	TArray<float> IterationStepPosition;
+	TArray<float> IterationStepAngles;
 
 	// FAnimNode_SkeletalControlBase interface
 	virtual void InitializeBoneReferences(const FBoneContainer& RequiredBones) override;
