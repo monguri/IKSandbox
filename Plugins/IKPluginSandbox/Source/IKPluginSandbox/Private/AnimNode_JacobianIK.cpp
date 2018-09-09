@@ -292,33 +292,36 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 				for (int32 Axis = 0; Axis < AXIS_COUNT; ++Axis)
 				{
+					// TODO:計算が行優先になってないのでは？
 					const FVector& JacobianColumn = (LocalTransformMatrix[Axis] * ParentRestMatrix).TransformPosition(EffectorLocationAtThisJointSpace);
-					Jacobian.Set((i - 1) * AXIS_COUNT + Axis, 0, JacobianColumn.X);	
-					Jacobian.Set((i - 1) * AXIS_COUNT + Axis, 1, JacobianColumn.Y);	
-					Jacobian.Set((i - 1) * AXIS_COUNT + Axis, 2, JacobianColumn.Z);	
+					Jacobian.Set(0, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.X);	
+					Jacobian.Set(1, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.Y);	
+					Jacobian.Set(2, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.Z);	
 				}
 			}
 		}
 
 		// Jacobianの疑似逆行列の計算
 		{
+			// TODO:計算が行優先になってないのでは？
 			Jt.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 			AnySizeMatrix::Transpose(Jacobian, Jt);
 
-			JtJ.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
-			AnySizeMatrix::Multiply(Jt, Jacobian, JtJ);
+			JJt.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
+			AnySizeMatrix::Multiply(Jacobian, Jt, JJt);
 
-			JtJi.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
-			AnySizeMatrix::Inverse3x3(JtJ, JtJi);
+			JJti.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
+			AnySizeMatrix::Inverse3x3(JJt, JJti);
 
 			PseudoInverseJacobian.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
-			AnySizeMatrix::Multiply(JtJi, Jt, PseudoInverseJacobian);
+			AnySizeMatrix::Multiply(Jt, JJti, PseudoInverseJacobian);
 
 			// TODO:とりあえず関節角変位目標値τは0にしておき、計算しない
 		}
 
 		// 回転角変位を求め、ワークデータの現在角を更新する
 		{
+			// TODO:計算が行優先になってないのでは？
 			AnySizeMatrix::TransformVector(PseudoInverseJacobian, IterationStepPosition, IterationStepAngles);
 			// TODO:IKルートから順に回転角をプラスしていく
 			check(true);
@@ -383,11 +386,11 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 
 	// ヤコビアンの行数は、目標値を設定する全エフェクタの出力変数の数なので、現在は1個だけの位置指定だけなので3
 	// ヤコビアンの列数は、IKの入力変数の数なので（ジョイント数-1）×回転の自由度3。-1なのはエフェクタの回転自由度は使わないから
-	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * AXIS_COUNT, AXIS_COUNT);
-	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
-	JtJ = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J^t * J
-	JtJi = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
-	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT); // (J^t * J)^-1 * J^t
+	Jacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
+	Jt = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * AXIS_COUNT, AXIS_COUNT);
+	JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
+	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
+	PseudoInverseJacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * AXIS_COUNT, AXIS_COUNT); // J^t * (J^t * J)^-1
 	IterationStepPosition.SetNumZeroed(AXIS_COUNT);
 	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
 }

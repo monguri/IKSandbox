@@ -74,8 +74,8 @@ private:
 
 	AnySizeMatrix Jacobian;
 	AnySizeMatrix Jt;
-	AnySizeMatrix JtJ;
-	AnySizeMatrix JtJi;
+	AnySizeMatrix JJt;
+	AnySizeMatrix JJti;
 	AnySizeMatrix PseudoInverseJacobian;
 	TArray<float> IterationStepPosition;
 	TArray<float> IterationStepAngles;
