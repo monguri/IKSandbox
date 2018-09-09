@@ -216,7 +216,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 	// ワークデータのTransformの初期化
 	for (IKJointWorkData& WorkData : IKJointWorkDatas)
 	{
-		WorkData.Transform = Output.Pose.GetComponentSpaceTransform(WorkData.BoneIndex);
+		WorkData.ComponentTransform = Output.Pose.GetComponentSpaceTransform(WorkData.BoneIndex);
 	}
 
 	// ノードの入力されたエフェクタの位置から目標位置への差分ベクトル
@@ -247,24 +247,24 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				{
 					if (IKRootJointParent.GetInt() == INDEX_NONE) // IKルートジョイントがスケルトンのルートのとき
 					{
-						LocalTransform = FTransform::Identity;
+						IKJointWorkDatas[i].LocalTransform = FTransform::Identity;
 					}
 					else // IKルートジョイントに親のジョイントがあるとき
 					{
-						LocalTransform = IKJointWorkDatas[i].Transform * Output.Pose.GetComponentSpaceTransform(IKRootJointParent).Inverse(); 
+						IKJointWorkDatas[i].LocalTransform = IKJointWorkDatas[i].ComponentTransform * Output.Pose.GetComponentSpaceTransform(IKRootJointParent).Inverse(); 
 					}
 				}
 				else
 				{
-					LocalTransform = IKJointWorkDatas[i].Transform * IKJointWorkDatas[i + 1].Transform.Inverse();
+					IKJointWorkDatas[i].LocalTransform = IKJointWorkDatas[i].ComponentTransform * IKJointWorkDatas[i + 1].ComponentTransform.Inverse();
 				}
 
-				const FRotator& LocalRotation = LocalTransform.GetRotation().Rotator();
+				const FRotator& LocalRotation = IKJointWorkDatas[i].LocalTransform.GetRotation().Rotator();
 
 				// ジョイントのローカル行列の回転部分を微分行列に置き換えたものを求める
 
 				FMatrix LocalTranslateMatrix = FMatrix::Identity;
-				LocalTranslateMatrix.ConcatTranslation(LocalTransform.GetTranslation());
+				LocalTranslateMatrix.ConcatTranslation(IKJointWorkDatas[i].LocalTransform.GetTranslation());
 
 				FMatrix LocalTransformMatrix[AXIS_COUNT];
 				LocalTransformMatrix[0] = LocalTranslateMatrix * (RotationDifferentialX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw));
@@ -272,7 +272,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				LocalTransformMatrix[2] = LocalTranslateMatrix * (RotationX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationDifferentialZ(LocalRotation.Yaw));
 
 				// ジョイントの座標系から見た現在のエフェクタ位置を求める
-				const FVector& EffectorLocationAtThisJointSpace = (IKJointWorkDatas[0].Transform * IKJointWorkDatas[i].Transform.Inverse()).TransformFVector4(FVector4(0, 0, 0, 1));
+				const FVector& EffectorLocationAtThisJointSpace = (IKJointWorkDatas[0].ComponentTransform * IKJointWorkDatas[i].ComponentTransform.Inverse()).TransformFVector4(FVector4(0, 0, 0, 1));
 				FMatrix ParentRestMatrix;
 				if (i == IKJointWorkDatas.Num() - 1) // IKルートジョイントのとき
 				{
@@ -287,7 +287,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				}
 				else
 				{
-					ParentRestMatrix = IKJointWorkDatas[i + 1].Transform.ToMatrixWithScale();
+					ParentRestMatrix = IKJointWorkDatas[i + 1].ComponentTransform.ToMatrixWithScale();
 				}
 
 				for (int32 Axis = 0; Axis < AXIS_COUNT; ++Axis)
@@ -323,15 +323,46 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 		{
 			// TODO:計算が行優先になってないのでは？
 			AnySizeMatrix::TransformVector(PseudoInverseJacobian, IterationStepPosition, IterationStepAngles);
-			// TODO:IKルートから順に回転角をプラスしていく
-			check(true);
+
+			// エフェクタのIKJointWorkDatas[0].LocalTransformは初期値のFTransform::Identityのまま
+			for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
+			{
+				FRotator LocalRotation = IKJointWorkDatas[i].LocalTransform.Rotator();
+				LocalRotation.Roll += IterationStepAngles[0];
+				LocalRotation.Pitch += IterationStepAngles[1];
+				LocalRotation.Yaw += IterationStepAngles[2];
+				IKJointWorkDatas[i].LocalTransform.SetRotation(FQuat(LocalRotation));
+			}
+
+			// 親から順にLocalTransformの変化をComponentTransformに反映していくので逆順にループする
+			for (int32 i = IKJointWorkDatas.Num() - 1; i >= 0; --i)
+			{
+				FTransform ParentTransform;
+				if (i == IKJointWorkDatas.Num() - 1) // IKルートジョイントのとき
+				{
+					if (IKRootJointParent.GetInt() == INDEX_NONE) // IKルートジョイントがスケルトンのルートのとき
+					{
+						ParentTransform = FTransform::Identity;
+					}
+					else // IKルートジョイントに親のジョイントがあるとき
+					{
+						ParentTransform = Output.Pose.GetComponentSpaceTransform(IKRootJointParent);
+					}
+				}
+				else
+				{
+					ParentTransform = IKJointWorkDatas[i + 1].ComponentTransform;
+				}
+
+				IKJointWorkDatas[i].ComponentTransform = IKJointWorkDatas[i].LocalTransform * ParentTransform;
+			}
 		}
 	}
 
 	// ボーンインデックスの昇順に渡したいので逆順にループする
 	for (int32 i = IKJointWorkDatas.Num() - 1; i >= 0; --i)
 	{
-		OutBoneTransforms.Add(FBoneTransform(IKJointWorkDatas[i].BoneIndex, IKJointWorkDatas[i].Transform));
+		OutBoneTransforms.Add(FBoneTransform(IKJointWorkDatas[i].BoneIndex, IKJointWorkDatas[i].ComponentTransform));
 	}
 }
 
@@ -374,14 +405,14 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 
 	while (IKJointIndex != INDEX_NONE && IKJointIndex != IKRootJoint.BoneIndex)
 	{
-		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity);
+		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
 
 		IKJointIndex = RequiredBones.GetParentBoneIndex(IKJointIndex);
 	}
 
 	if (IKJointIndex == IKRootJoint.BoneIndex)
 	{
-		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity);
+		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
 	}
 
 	// ヤコビアンの行数は、目標値を設定する全エフェクタの出力変数の数なので、現在は1個だけの位置指定だけなので3

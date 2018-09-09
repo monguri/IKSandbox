@@ -44,10 +44,11 @@ private:
 	struct IKJointWorkData
 	{
 		FCompactPoseBoneIndex BoneIndex;
-		FTransform Transform;
+		FTransform ComponentTransform;
+		FTransform LocalTransform;
 
-		IKJointWorkData() : BoneIndex(INDEX_NONE), Transform(FTransform::Identity) {}
-		IKJointWorkData(FCompactPoseBoneIndex _BoneIndex, const FTransform& _Transform) : BoneIndex(_BoneIndex), Transform(_Transform) {}
+		IKJointWorkData() : BoneIndex(INDEX_NONE), ComponentTransform(FTransform::Identity), LocalTransform(FTransform::Identity) {}
+		IKJointWorkData(FCompactPoseBoneIndex _BoneIndex, const FTransform& _ComponentTransform, const FTransform& _LocalTransform) : BoneIndex(_BoneIndex), ComponentTransform(_ComponentTransform), LocalTransform(_LocalTransform) {}
 	};
 
 	TArray<IKJointWorkData> IKJointWorkDatas;
