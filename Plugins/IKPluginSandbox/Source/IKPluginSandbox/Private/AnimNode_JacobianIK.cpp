@@ -166,19 +166,19 @@ float FAnimNode_JacobianIK::AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMat
 
 void FAnimNode_JacobianIK::AnySizeMatrix::TransformVector(const AnySizeMatrix& InMatrix, const TArray<float>& InVector, TArray<float>& OutVector)
 {
-	check((int32)InMatrix.NumColumn == InVector.Num());
-	check((int32)InMatrix.NumRow == OutVector.Num());
+	check((int32)InMatrix.NumRow == InVector.Num());
+	check((int32)InMatrix.NumColumn == OutVector.Num());
 
-	for (int32 Row = 0; Row < OutVector.Num(); ++Row)
+	for (int32 Column = 0; Column < OutVector.Num(); ++Column)
 	{
-		OutVector[Row] = 0.0f;
+		OutVector[Column] = 0.0f;
 	}
 
-	for (int32 Row = 0; Row < InMatrix.NumRow; ++Row)
+	for (int32 Column = 0; Column < InMatrix.NumColumn; ++Column)
 	{
-		for (int32 Column = 0; Column < InMatrix.NumColumn; ++Column)
+		for (int32 Row = 0; Row < InMatrix.NumRow; ++Row)
 		{
-			OutVector[Row] += InMatrix.Get(Row, Column) * InVector[Column];
+			OutVector[Column] += InVector[Row] * InMatrix.Get(Row, Column);
 		}
 	}
 }
@@ -269,10 +269,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				LocalTranslateMatrix = LocalTranslateMatrix.ConcatTranslation(IKJointWorkDatas[i].LocalTransform.GetTranslation());
 
 				FMatrix LocalMatrix[AXIS_COUNT];
-				// TODO:この積の順番はあってるのか？
-				LocalMatrix[0] = LocalTranslateMatrix * (RotationDifferentialX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw));
-				LocalMatrix[1] = LocalTranslateMatrix * (RotationX(LocalRotation.Roll) * RotationDifferentialY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw));
-				LocalMatrix[2] = LocalTranslateMatrix * (RotationX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationDifferentialZ(LocalRotation.Yaw));
+				LocalMatrix[0] = (RotationDifferentialX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw)) * LocalTranslateMatrix;
+				LocalMatrix[1] = (RotationX(LocalRotation.Roll) * RotationDifferentialY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw)) * LocalTranslateMatrix;
+				LocalMatrix[2] = (RotationX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationDifferentialZ(LocalRotation.Yaw)) * LocalTranslateMatrix;
 
 				// ジョイントの座標系から見た現在のエフェクタ位置を求める
 				const FMatrix& ChildRestMatrix = (IKJointWorkDatas[0].ComponentTransform.ToMatrixWithScale() * IKJointWorkDatas[i].ComponentTransform.Inverse().ToMatrixWithScale());
@@ -311,20 +310,19 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			AnySizeMatrix::Transpose(Jacobian, Jt);
 
 			JJt.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
-			AnySizeMatrix::Multiply(Jacobian, Jt, JJt);
+			AnySizeMatrix::Multiply(Jt, Jacobian, JJt);
 
 			JJti.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 			AnySizeMatrix::Inverse3x3(JJt, JJti);
 
 			PseudoInverseJacobian.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
-			AnySizeMatrix::Multiply(Jt, JJti, PseudoInverseJacobian);
+			AnySizeMatrix::Multiply(JJti, Jt, PseudoInverseJacobian);
 
 			// TODO:とりあえず関節角変位目標値τは0にしておき、計算しない
 		}
 
 		// 回転角変位を求め、ワークデータの現在角を更新する
 		{
-			// TODO:計算が行優先になってないのでは？
 			AnySizeMatrix::TransformVector(PseudoInverseJacobian, IterationStepPosition, IterationStepAngles);
 
 			// エフェクタのIKJointWorkDatas[0].LocalTransformは初期値のFTransform::Identityのまま
@@ -418,13 +416,13 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
 	}
 
-	// ヤコビアンの行数は、目標値を設定する全エフェクタの出力変数の数なので、現在は1個だけの位置指定だけなので3
-	// ヤコビアンの列数は、IKの入力変数の数なので（ジョイント数-1）×回転の自由度3。-1なのはエフェクタの回転自由度は使わないから
-	Jacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
-	Jt = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * AXIS_COUNT, AXIS_COUNT);
+	// ヤコビアンの列数は、目標値を設定する全エフェクタの出力変数の数なので、現在は1個だけの位置指定だけなので3
+	// ヤコビアンの行数は、IKの入力変数の数なので（ジョイント数-1）×回転の自由度3。-1なのはエフェクタの回転自由度は使わないから
+	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * AXIS_COUNT, AXIS_COUNT);
+	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
 	JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
 	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
-	PseudoInverseJacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * AXIS_COUNT, AXIS_COUNT); // J^t * (J^t * J)^-1
+	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT); // J^t * (J^t * J)^-1
 	IterationStepPosition.SetNumZeroed(AXIS_COUNT);
 	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
 }
