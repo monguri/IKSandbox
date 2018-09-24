@@ -394,8 +394,6 @@ bool FAnimNode_JacobianIK::IsValidToEvaluate(const USkeleton* Skeleton, const FB
 		return false;
 	}
 
-	IKRootJointParent = FCompactPoseBoneIndex(RequiredBones.GetParentBoneIndex(IKRootJoint.BoneIndex));
-
 	return (IKJointWorkDatas.Num() > 0); // InitializeBoneReferencesは確かコンパイル時に呼ばれるけどこっちは実行時に呼ばれる
 }
 
@@ -403,6 +401,8 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 {
 	IKRootJoint.Initialize(RequiredBones);
 	EffectorJoint.Initialize(RequiredBones);
+
+	IKRootJointParent = FCompactPoseBoneIndex(RequiredBones.GetParentBoneIndex(IKRootJoint.BoneIndex));
 
 	// EffectorJointから、IKRootJointまで、IKRootJointにぶつからなければルートジョイントまでワークデータを持たせる
 	FCompactPoseBoneIndex IKJointIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
