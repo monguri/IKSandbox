@@ -5,8 +5,10 @@
 
 namespace
 {
-// 回転方向の3成分、XYZの3成分に使う定数
+// XYZの3成分に使う定数
 const int32 AXIS_COUNT = 3;
+// 回転方向の3成分に使う定数
+const int32 ROTATION_AXIS_COUNT = 3;
 
 // degree単位でのsin/cos関数
 float SinD(float degree) { return FMath::Sin(FMath::DegreesToRadians(degree)); }
@@ -268,7 +270,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				FMatrix LocalTranslateMatrix = FMatrix::Identity;
 				LocalTranslateMatrix = LocalTranslateMatrix.ConcatTranslation(IKJointWorkDatas[i].LocalTransform.GetTranslation());
 
-				FMatrix LocalMatrix[AXIS_COUNT]; // この要素3つは、XYZでなくRoll,Pitch,Yaw
+				FMatrix LocalMatrix[ROTATION_AXIS_COUNT];
 				LocalMatrix[0] = (RotationDifferentialX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw)) * LocalTranslateMatrix;
 				LocalMatrix[1] = (RotationX(LocalRotation.Roll) * RotationDifferentialY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw)) * LocalTranslateMatrix;
 				LocalMatrix[2] = (RotationX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationDifferentialZ(LocalRotation.Yaw)) * LocalTranslateMatrix;
@@ -292,14 +294,14 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 					ParentRestMatrix = IKJointWorkDatas[i + 1].ComponentTransform.ToMatrixWithScale();
 				}
 
-				for (int32 Axis = 0; Axis < AXIS_COUNT; ++Axis) // この要素3つは、XYZでなくRoll,Pitch,Yaw
+				for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
 				{
 					// 行ベクトル形式でヤコビアン行列も扱う
 					// 行方向が各ジョイントの回転角、列方向がXYZ
-					const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[Axis] * ParentRestMatrix).TransformFVector4(FVector4(0, 0, 0, 1));
-					Jacobian.Set((i - 1) * AXIS_COUNT + Axis, 0, JacobianRow.X);
-					Jacobian.Set((i - 1) * AXIS_COUNT + Axis, 1, JacobianRow.Y);	
-					Jacobian.Set((i - 1) * AXIS_COUNT + Axis, 2, JacobianRow.Z);	
+					const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformFVector4(FVector4(0, 0, 0, 1));
+					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 0, JacobianRow.X);
+					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 1, JacobianRow.Y);	
+					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 2, JacobianRow.Z);	
 				}
 			}
 		}
@@ -419,11 +421,11 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 
 	// ヤコビアンの列数は、目標値を設定する全エフェクタの出力変数の数なので、現在は1個だけの位置指定だけなので3
 	// ヤコビアンの行数は、IKの入力変数の数なので（ジョイント数-1）×回転の自由度3。-1なのはエフェクタの回転自由度は使わないから
-	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * AXIS_COUNT, AXIS_COUNT);
-	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
+	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT, AXIS_COUNT);
+	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
 	JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
 	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
-	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * AXIS_COUNT); // J^t * (J^t * J)^-1
+	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT); // J^t * (J^t * J)^-1
 	IterationStepPosition.SetNumZeroed(AXIS_COUNT);
-	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * AXIS_COUNT);
+	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
 }
