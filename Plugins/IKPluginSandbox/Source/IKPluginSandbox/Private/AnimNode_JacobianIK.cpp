@@ -268,7 +268,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				FMatrix LocalTranslateMatrix = FMatrix::Identity;
 				LocalTranslateMatrix = LocalTranslateMatrix.ConcatTranslation(IKJointWorkDatas[i].LocalTransform.GetTranslation());
 
-				FMatrix LocalMatrix[AXIS_COUNT];
+				FMatrix LocalMatrix[AXIS_COUNT]; // この要素3つは、XYZでなくRoll,Pitch,Yaw
 				LocalMatrix[0] = (RotationDifferentialX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw)) * LocalTranslateMatrix;
 				LocalMatrix[1] = (RotationX(LocalRotation.Roll) * RotationDifferentialY(LocalRotation.Pitch) * RotationZ(LocalRotation.Yaw)) * LocalTranslateMatrix;
 				LocalMatrix[2] = (RotationX(LocalRotation.Roll) * RotationY(LocalRotation.Pitch) * RotationDifferentialZ(LocalRotation.Yaw)) * LocalTranslateMatrix;
@@ -292,13 +292,14 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 					ParentRestMatrix = IKJointWorkDatas[i + 1].ComponentTransform.ToMatrixWithScale();
 				}
 
-				for (int32 Axis = 0; Axis < AXIS_COUNT; ++Axis)
+				for (int32 Axis = 0; Axis < AXIS_COUNT; ++Axis) // この要素3つは、XYZでなくRoll,Pitch,Yaw
 				{
-					// TODO:計算が行優先になってないのでは？
-					const FVector& JacobianColumn = (ChildRestMatrix * LocalMatrix[Axis] * ParentRestMatrix).TransformFVector4(FVector4(0, 0, 0, 1));
-					Jacobian.Set(0, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.X);
-					Jacobian.Set(1, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.Y);	
-					Jacobian.Set(2, (i - 1) * AXIS_COUNT + Axis, JacobianColumn.Z);	
+					// 行ベクトル形式でヤコビアン行列も扱う
+					// 行方向が各ジョイントの回転角、列方向がXYZ
+					const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[Axis] * ParentRestMatrix).TransformFVector4(FVector4(0, 0, 0, 1));
+					Jacobian.Set((i - 1) * AXIS_COUNT + Axis, 0, JacobianRow.X);
+					Jacobian.Set((i - 1) * AXIS_COUNT + Axis, 1, JacobianRow.Y);	
+					Jacobian.Set((i - 1) * AXIS_COUNT + Axis, 2, JacobianRow.Z);	
 				}
 			}
 		}
