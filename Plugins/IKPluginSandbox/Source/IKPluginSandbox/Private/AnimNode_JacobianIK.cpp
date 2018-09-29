@@ -298,7 +298,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				{
 					// 行ベクトル形式でヤコビアン行列も扱う
 					// 行方向が各ジョイントの回転角、列方向がXYZ
-					const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformFVector4(FVector4(0, 0, 0, 1));
+					const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
 					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 0, JacobianRow.X);
 					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 1, JacobianRow.Y);	
 					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 2, JacobianRow.Z);	
@@ -308,6 +308,18 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 		// Jacobianの疑似逆行列の計算
 		{
+#if 1 // direct inverse for 3x3 debug
+			if (IKJointWorkDatas.Num() == 2)
+			{
+				Ji.ZeroClear();
+				float Determinant = AnySizeMatrix::Inverse3x3(Jacobian, Ji);
+				//if (FMath::Abs(Determinant) < KINDA_SMALL_NUMBER)
+				if (FMath::Abs(Determinant) < SMALL_NUMBER)
+				{
+					return;
+				}
+			}
+#endif
 			// TODO:計算が行優先になってないのでは？
 			Jt.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 			AnySizeMatrix::Transpose(Jacobian, Jt);
@@ -316,7 +328,12 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			AnySizeMatrix::Multiply(Jt, Jacobian, JJt);
 
 			JJti.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
-			AnySizeMatrix::Inverse3x3(JJt, JJti);
+			float Determinant = AnySizeMatrix::Inverse3x3(JJt, JJti);
+			//if (FMath::Abs(Determinant) < KINDA_SMALL_NUMBER)
+			if (FMath::Abs(Determinant) < SMALL_NUMBER)
+			{
+				return;
+			}
 
 			PseudoInverseJacobian.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 			AnySizeMatrix::Multiply(JJti, Jt, PseudoInverseJacobian);
@@ -327,6 +344,12 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 		// 回転角変位を求め、ワークデータの現在角を更新する
 		{
 			AnySizeMatrix::TransformVector(PseudoInverseJacobian, IterationStepPosition, IterationStepAngles);
+#if 1 // direct inverse for 3x3 debug
+			if (IKJointWorkDatas.Num() == 2)
+			{
+				AnySizeMatrix::TransformVector(Ji, IterationStepPosition, IterationStepAngles);
+			}
+#endif
 
 			// エフェクタのIKJointWorkDatas[0].LocalTransformは初期値のFTransform::Identityのまま
 			for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
@@ -422,6 +445,12 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 	// ヤコビアンの列数は、目標値を設定する全エフェクタの出力変数の数なので、現在は1個だけの位置指定だけなので3
 	// ヤコビアンの行数は、IKの入力変数の数なので（ジョイント数-1）×回転の自由度3。-1なのはエフェクタの回転自由度は使わないから
 	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT, AXIS_COUNT);
+#if 1 // direct inverse for 3x3 debug
+	if (IKJointWorkDatas.Num() == 2)
+	{
+		Ji = AnySizeMatrix(ROTATION_AXIS_COUNT, AXIS_COUNT);
+	}
+#endif
 	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
 	JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
 	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
