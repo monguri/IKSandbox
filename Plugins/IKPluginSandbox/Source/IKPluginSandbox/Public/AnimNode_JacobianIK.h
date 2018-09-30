@@ -74,9 +74,6 @@ private:
 	FCompactPoseBoneIndex IKRootJointParent;
 
 	AnySizeMatrix Jacobian;
-#if 1 // direct inverse for 3x3 debug
-	AnySizeMatrix Ji;
-#endif
 	AnySizeMatrix Jt;
 	AnySizeMatrix JJt;
 	AnySizeMatrix JJti;

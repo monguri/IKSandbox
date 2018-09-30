@@ -294,32 +294,32 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 					ParentRestMatrix = IKJointWorkDatas[i + 1].ComponentTransform.ToMatrixWithScale();
 				}
 
-				for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
+				if (i == 1) // エフェクタのひとつ親のジョイントのとき
 				{
-					// 行ベクトル形式でヤコビアン行列も扱う
-					// 行方向が各ジョイントの回転角、列方向がXYZ
-					const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
-					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 0, JacobianRow.X);
-					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 1, JacobianRow.Y);	
-					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 2, JacobianRow.Z);	
+					// X回転軸を含めない
+					for (int32 RotAxis = 1; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
+					{
+						const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
+						Jacobian.Set(RotAxis - 1, 0, JacobianRow.X);
+						Jacobian.Set(RotAxis - 1, 1, JacobianRow.Y);	
+						Jacobian.Set(RotAxis - 1, 2, JacobianRow.Z);	
+					}
+				}
+				else
+				{
+					for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
+					{
+						const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
+						Jacobian.Set(ROTATION_AXIS_COUNT - 1 + (i - 2) * ROTATION_AXIS_COUNT + RotAxis, 0, JacobianRow.X);
+						Jacobian.Set(ROTATION_AXIS_COUNT - 1 + (i - 2) * ROTATION_AXIS_COUNT + RotAxis, 1, JacobianRow.Y);	
+						Jacobian.Set(ROTATION_AXIS_COUNT - 1 + (i - 2) * ROTATION_AXIS_COUNT + RotAxis, 2, JacobianRow.Z);	
+					}
 				}
 			}
 		}
 
 		// Jacobianの疑似逆行列の計算
 		{
-#if 1 // direct inverse for 3x3 debug
-			if (IKJointWorkDatas.Num() == 2)
-			{
-				Ji.ZeroClear();
-				float Determinant = AnySizeMatrix::Inverse3x3(Jacobian, Ji);
-				//if (FMath::Abs(Determinant) < KINDA_SMALL_NUMBER)
-				if (FMath::Abs(Determinant) < SMALL_NUMBER)
-				{
-					return;
-				}
-			}
-#endif
 			// TODO:計算が行優先になってないのでは？
 			Jt.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 			AnySizeMatrix::Transpose(Jacobian, Jt);
@@ -344,20 +344,22 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 		// 回転角変位を求め、ワークデータの現在角を更新する
 		{
 			AnySizeMatrix::TransformVector(PseudoInverseJacobian, IterationStepPosition, IterationStepAngles);
-#if 1 // direct inverse for 3x3 debug
-			if (IKJointWorkDatas.Num() == 2)
-			{
-				AnySizeMatrix::TransformVector(Ji, IterationStepPosition, IterationStepAngles);
-			}
-#endif
 
 			// エフェクタのIKJointWorkDatas[0].LocalTransformは初期値のFTransform::Identityのまま
 			for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
 			{
 				FRotator LocalRotation = IKJointWorkDatas[i].LocalTransform.Rotator();
-				LocalRotation.Roll += IterationStepAngles[0];
-				LocalRotation.Pitch += IterationStepAngles[1];
-				LocalRotation.Yaw += IterationStepAngles[2];
+				if (i == 1)
+				{
+					LocalRotation.Pitch += IterationStepAngles[0];
+					LocalRotation.Yaw += IterationStepAngles[1];
+				}
+				else
+				{
+					LocalRotation.Roll += IterationStepAngles[0];
+					LocalRotation.Pitch += IterationStepAngles[1];
+					LocalRotation.Yaw += IterationStepAngles[2];
+				}
 				IKJointWorkDatas[i].LocalTransform.SetRotation(FQuat(LocalRotation));
 			}
 
@@ -417,7 +419,7 @@ bool FAnimNode_JacobianIK::IsValidToEvaluate(const USkeleton* Skeleton, const FB
 		return false;
 	}
 
-	return (IKJointWorkDatas.Num() > 0); // InitializeBoneReferencesは確かコンパイル時に呼ばれるけどこっちは実行時に呼ばれる
+	return (IKJointWorkDatas.Num() >= 2); // 最低限エフェクタと、一つIK制御ジョイントがないと意味がない
 }
 
 void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& RequiredBones)
@@ -444,17 +446,20 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 
 	// ヤコビアンの列数は、目標値を設定する全エフェクタの出力変数の数なので、現在は1個だけの位置指定だけなので3
 	// ヤコビアンの行数は、IKの入力変数の数なので（ジョイント数-1）×回転の自由度3。-1なのはエフェクタの回転自由度は使わないから
-	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT, AXIS_COUNT);
-#if 1 // direct inverse for 3x3 debug
-	if (IKJointWorkDatas.Num() == 2)
+	// ただし、エフェクタのひとつ親のジョイントはねじり方向の軸回転はエフェクタの位置に影響を及ぼさないため逆行列の計算ができなくなるので
+	// ヤコビアンからはずす
+	if (IKJointWorkDatas.Num() >= 2)
 	{
-		Ji = AnySizeMatrix(ROTATION_AXIS_COUNT, AXIS_COUNT);
+		Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 2) * ROTATION_AXIS_COUNT + ROTATION_AXIS_COUNT - 1, AXIS_COUNT);
+		Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 2) * ROTATION_AXIS_COUNT + ROTATION_AXIS_COUNT - 1);
+		JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
+		JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
+		PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 2) * ROTATION_AXIS_COUNT + ROTATION_AXIS_COUNT - 1); // J^t * (J^t * J)^-1
+		IterationStepPosition.SetNumZeroed(AXIS_COUNT);
+		IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 2) * ROTATION_AXIS_COUNT + ROTATION_AXIS_COUNT - 1);
 	}
-#endif
-	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
-	JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
-	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
-	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT); // J^t * (J^t * J)^-1
-	IterationStepPosition.SetNumZeroed(AXIS_COUNT);
-	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
+	else
+	{
+		// IsValidToEvaluateで処理をはじくのでここでは何もしない
+	}
 }
