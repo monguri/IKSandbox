@@ -136,6 +136,22 @@ void FAnimNode_JacobianIK::AnySizeMatrix::Multiply(const AnySizeMatrix& A, const
 	}
 }
 
+void FAnimNode_JacobianIK::AnySizeMatrix::Add(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult)
+{
+	check(A.NumRow == B.NumRow);
+	check(A.NumColumn == B.NumColumn);
+	check(OutResult.NumRow == A.NumRow);
+	check(OutResult.NumColumn == B.NumColumn);
+
+	for (int32 Row = 0; Row < OutResult.NumRow; ++Row)
+	{
+		for (int32 Column = 0; Column < OutResult.NumColumn; ++Column)
+		{
+			OutResult.Set(Row, Column, A.Get(Row, Column) + B.Get(Row, Column));
+		}
+	}
+}
+
 float FAnimNode_JacobianIK::AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix)
 {
 	float Determinant =
@@ -190,6 +206,7 @@ FAnimNode_JacobianIK::FAnimNode_JacobianIK()
 	, NumIteration(10)
 	, Precision(SMALL_NUMBER)
 	, IKRootJointParent(INDEX_NONE)
+	, Lambda(0.0f)
 {
 }
 
@@ -313,8 +330,15 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			JJt.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 			AnySizeMatrix::Multiply(Jt, Jacobian, JJt);
 
+			JJtPlusLambdaI.ZeroClear();
+			AnySizeMatrix::Add(JJt, LambdaI, JJtPlusLambdaI);
+
 			JJti.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
+#if 0
 			float Determinant = AnySizeMatrix::Inverse3x3(JJt, JJti);
+#else
+			float Determinant = AnySizeMatrix::Inverse3x3(JJtPlusLambdaI, JJti);
+#endif
 			//if (FMath::Abs(Determinant) < KINDA_SMALL_NUMBER)
 			if (FMath::Abs(Determinant) < SMALL_NUMBER)
 			{
@@ -425,8 +449,17 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT, AXIS_COUNT);
 	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
 	JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
-	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
-	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT); // J^t * (J^t * J)^-1
+
+	LambdaI = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // lambda * I
+	LambdaI.ZeroClear();
+	LambdaI.Set(0, 0, Lambda);
+	LambdaI.Set(1, 1, Lambda);
+	LambdaI.Set(2, 2, Lambda);
+
+	JJtPlusLambdaI = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * J^t + lambda * I
+	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J * J^t + lambda * I)^-1
+	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT); // J^t * (J * J^t)^-1
+
 	IterationStepPosition.SetNumZeroed(AXIS_COUNT);
 	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
 }

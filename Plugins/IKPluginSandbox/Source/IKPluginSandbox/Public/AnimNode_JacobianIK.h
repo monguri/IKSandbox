@@ -32,6 +32,10 @@ struct IKPLUGINSANDBOX_API FAnimNode_JacobianIK : public FAnimNode_SkeletalContr
 	UPROPERTY(EditAnywhere, Category=IK)
 	float Precision;
 
+	/** Normalize parameter for singular pose. */
+	UPROPERTY(EditAnywhere, Category=IK)
+	float Lambda;
+
 	FAnimNode_JacobianIK();
 
 public:
@@ -62,6 +66,7 @@ private:
 		void ZeroClear();
 		static void Transpose(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
 		static void Multiply(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
+		static void Add(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
 		static float Inverse3x3(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
 		static void TransformVector(const AnySizeMatrix& InMatrix, const TArray<float>& InVector, TArray<float>& OutVector);
 
@@ -76,8 +81,10 @@ private:
 	AnySizeMatrix Jacobian;
 	AnySizeMatrix Jt;
 	AnySizeMatrix JJt;
+	AnySizeMatrix JJtPlusLambdaI;
 	AnySizeMatrix JJti;
 	AnySizeMatrix PseudoInverseJacobian;
+	AnySizeMatrix LambdaI;
 	TArray<float> IterationStepPosition;
 	TArray<float> IterationStepAngles;
 
