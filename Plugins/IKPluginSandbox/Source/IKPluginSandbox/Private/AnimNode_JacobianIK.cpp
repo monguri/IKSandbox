@@ -294,26 +294,12 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 					ParentRestMatrix = IKJointWorkDatas[i + 1].ComponentTransform.ToMatrixWithScale();
 				}
 
-				if (i == 1) // エフェクタのひとつ親のジョイントのとき
+				for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
 				{
-					// X回転軸を含めない
-					for (int32 RotAxis = 1; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
-					{
-						const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
-						Jacobian.Set(RotAxis - 1, 0, JacobianRow.X);
-						Jacobian.Set(RotAxis - 1, 1, JacobianRow.Y);	
-						Jacobian.Set(RotAxis - 1, 2, JacobianRow.Z);	
-					}
-				}
-				else
-				{
-					for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
-					{
-						const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
-						Jacobian.Set(ROTATION_AXIS_COUNT - 1 + (i - 2) * ROTATION_AXIS_COUNT + RotAxis, 0, JacobianRow.X);
-						Jacobian.Set(ROTATION_AXIS_COUNT - 1 + (i - 2) * ROTATION_AXIS_COUNT + RotAxis, 1, JacobianRow.Y);	
-						Jacobian.Set(ROTATION_AXIS_COUNT - 1 + (i - 2) * ROTATION_AXIS_COUNT + RotAxis, 2, JacobianRow.Z);	
-					}
+					const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
+					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 0, JacobianRow.X);
+					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 1, JacobianRow.Y);	
+					Jacobian.Set((i - 1) * ROTATION_AXIS_COUNT + RotAxis, 2, JacobianRow.Z);	
 				}
 			}
 		}
@@ -349,17 +335,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
 			{
 				FRotator LocalRotation = IKJointWorkDatas[i].LocalTransform.Rotator();
-				if (i == 1)
-				{
-					LocalRotation.Pitch += IterationStepAngles[0];
-					LocalRotation.Yaw += IterationStepAngles[1];
-				}
-				else
-				{
-					LocalRotation.Roll += IterationStepAngles[0];
-					LocalRotation.Pitch += IterationStepAngles[1];
-					LocalRotation.Yaw += IterationStepAngles[2];
-				}
+				LocalRotation.Roll += IterationStepAngles[0];
+				LocalRotation.Pitch += IterationStepAngles[1];
+				LocalRotation.Yaw += IterationStepAngles[2];
 				IKJointWorkDatas[i].LocalTransform.SetRotation(FQuat(LocalRotation));
 			}
 
@@ -444,22 +422,11 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
 	}
 
-	// ヤコビアンの列数は、目標値を設定する全エフェクタの出力変数の数なので、現在は1個だけの位置指定だけなので3
-	// ヤコビアンの行数は、IKの入力変数の数なので（ジョイント数-1）×回転の自由度3。-1なのはエフェクタの回転自由度は使わないから
-	// ただし、エフェクタのひとつ親のジョイントはねじり方向の軸回転はエフェクタの位置に影響を及ぼさないため逆行列の計算ができなくなるので
-	// ヤコビアンからはずす
-	if (IKJointWorkDatas.Num() >= 2)
-	{
-		Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 2) * ROTATION_AXIS_COUNT + ROTATION_AXIS_COUNT - 1, AXIS_COUNT);
-		Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 2) * ROTATION_AXIS_COUNT + ROTATION_AXIS_COUNT - 1);
-		JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
-		JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
-		PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 2) * ROTATION_AXIS_COUNT + ROTATION_AXIS_COUNT - 1); // J^t * (J^t * J)^-1
-		IterationStepPosition.SetNumZeroed(AXIS_COUNT);
-		IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 2) * ROTATION_AXIS_COUNT + ROTATION_AXIS_COUNT - 1);
-	}
-	else
-	{
-		// IsValidToEvaluateで処理をはじくのでここでは何もしない
-	}
+	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT, AXIS_COUNT);
+	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
+	JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
+	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J^t * J)^-1
+	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT); // J^t * (J^t * J)^-1
+	IterationStepPosition.SetNumZeroed(AXIS_COUNT);
+	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
 }
