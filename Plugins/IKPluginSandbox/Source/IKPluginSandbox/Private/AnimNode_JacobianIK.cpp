@@ -359,9 +359,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
 			{
 				FRotator LocalRotation = IKJointWorkDatas[i].LocalTransform.Rotator();
-				LocalRotation.Roll += FMath::RadiansToDegrees(IterationStepAngles[0]);
-				LocalRotation.Pitch += FMath::RadiansToDegrees(IterationStepAngles[1]);
-				LocalRotation.Yaw += FMath::RadiansToDegrees(IterationStepAngles[2]);
+				LocalRotation.Roll += FMath::RadiansToDegrees(IterationStepAngles[(i - 1) * ROTATION_AXIS_COUNT + 0]);
+				LocalRotation.Pitch += FMath::RadiansToDegrees(IterationStepAngles[(i - 1) * ROTATION_AXIS_COUNT + 1]);
+				LocalRotation.Yaw += FMath::RadiansToDegrees(IterationStepAngles[(i - 1) * ROTATION_AXIS_COUNT + 2]);
 				IKJointWorkDatas[i].LocalTransform.SetRotation(FQuat(LocalRotation));
 			}
 
