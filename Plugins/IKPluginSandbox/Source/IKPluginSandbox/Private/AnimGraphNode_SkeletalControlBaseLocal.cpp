@@ -43,7 +43,7 @@ FText UAnimGraphNode_SkeletalControlBaseLocal::GetTooltipText() const
 
 void UAnimGraphNode_SkeletalControlBaseLocal::CreateOutputPins()
 {
-	CreatePin(EGPD_Output, UAnimationGraphSchema::PC_Struct, FComponentSpacePoseLink::StaticStruct(), TEXT("Pose"));
+	CreatePin(EGPD_Output, UAnimationGraphSchema::PC_Struct, FPoseLink::StaticStruct(), TEXT("Pose"));
 }
 
 void UAnimGraphNode_SkeletalControlBaseLocal::GetDefaultValue(const FName UpdateDefaultValueName, FVector& OutVec)
