@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "AnimGraphNode_CCDIK.h"
+#include "AnimGraphNode_CCDIKPractice.h"
 
 
 /////////////////////////////////////////////////////
@@ -8,22 +8,22 @@
 
 #define LOCTEXT_NAMESPACE "AnimGraph_CCDIK"
 
-UAnimGraphNode_CCDIK::UAnimGraphNode_CCDIK(const FObjectInitializer& ObjectInitializer)
+UAnimGraphNode_CCDIKPractice::UAnimGraphNode_CCDIKPractice(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 }
 
-FText UAnimGraphNode_CCDIK::GetControllerDescription() const
+FText UAnimGraphNode_CCDIKPractice::GetControllerDescription() const
 {
 	return LOCTEXT("CCDIKNode", "CCD-IK");
 }
 
-FText UAnimGraphNode_CCDIK::GetTooltipText() const
+FText UAnimGraphNode_CCDIKPractice::GetTooltipText() const
 {
 	return LOCTEXT("AnimGraphNode_CCDIK_Tooltip", "This node allow a bone to trace or follow another bone");
 }
 
-FText UAnimGraphNode_CCDIK::GetNodeTitle(ENodeTitleType::Type TitleType) const
+FText UAnimGraphNode_CCDIKPractice::GetNodeTitle(ENodeTitleType::Type TitleType) const
 {
 	return GetControllerDescription();
 }

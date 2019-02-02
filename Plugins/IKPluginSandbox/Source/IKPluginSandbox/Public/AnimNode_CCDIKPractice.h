@@ -5,10 +5,10 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "BoneControllers/AnimNode_SkeletalControlBase.h"
-#include "AnimNode_CCDIK.generated.h"
+#include "AnimNode_CCDIKPractice.generated.h"
 
 USTRUCT(BlueprintInternalUseOnly)
-struct IKPLUGINSANDBOX_API FAnimNode_CCDIK : public FAnimNode_SkeletalControlBase
+struct IKPLUGINSANDBOX_API FAnimNode_CCDIKPractice : public FAnimNode_SkeletalControlBase
 {
 	GENERATED_USTRUCT_BODY()
 
@@ -32,7 +32,7 @@ struct IKPLUGINSANDBOX_API FAnimNode_CCDIK : public FAnimNode_SkeletalControlBas
 	UPROPERTY(EditAnywhere, Category=IK)
 	float Precision;
 
-	FAnimNode_CCDIK();
+	FAnimNode_CCDIKPractice();
 
 public:
 	// FAnimNode_SkeletalControlBase interface

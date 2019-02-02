@@ -1,16 +1,16 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "AnimNode_CCDIK.h"
+#include "AnimNode_CCDIKPractice.h"
 #include "Animation/AnimInstanceProxy.h"
 
-FAnimNode_CCDIK::FAnimNode_CCDIK()
+FAnimNode_CCDIKPractice::FAnimNode_CCDIKPractice()
 	: EffectorTargetLocation(0.0f, 0.0f, 0.0f)
 	, MaxIteration(10)
 	, Precision(SMALL_NUMBER)
 {
 }
 
-void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
+void FAnimNode_CCDIKPractice::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
 {
 	check(Output.AnimInstanceProxy->GetSkelMeshComponent());
 	check(OutBoneTransforms.Num() == 0);
@@ -88,7 +88,7 @@ void FAnimNode_CCDIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 	}
 }
 
-bool FAnimNode_CCDIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
+bool FAnimNode_CCDIKPractice::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
 {
 	if (!IKRootJoint.IsValidToEvaluate(RequiredBones))
 	{
@@ -115,7 +115,7 @@ bool FAnimNode_CCDIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneCo
 	return (IKJointWorkDatas.Num() > 0); // InitializeBoneReferencesは確かコンパイル時に呼ばれるけどこっちは実行時に呼ばれる
 }
 
-void FAnimNode_CCDIK::InitializeBoneReferences(const FBoneContainer& RequiredBones)
+void FAnimNode_CCDIKPractice::InitializeBoneReferences(const FBoneContainer& RequiredBones)
 {
 	IKRootJoint.Initialize(RequiredBones);
 	EffectorJoint.Initialize(RequiredBones);

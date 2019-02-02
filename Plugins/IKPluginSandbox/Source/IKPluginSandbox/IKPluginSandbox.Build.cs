@@ -10,7 +10,6 @@ public class IKPluginSandbox : ModuleRules
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
-				"IKPluginSandbox/Public"
 				// ... add public include paths required here ...
 			}
 			);
@@ -18,7 +17,6 @@ public class IKPluginSandbox : ModuleRules
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
-				"IKPluginSandbox/Private",
 				// ... add other private include paths required here ...
 			}
 			);

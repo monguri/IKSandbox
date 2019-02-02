@@ -5,19 +5,19 @@
 #include "CoreMinimal.h"
 #include "EdGraph/EdGraphNodeUtils.h"
 #include "AnimGraphNode_SkeletalControlBase.h"
-#include "AnimNode_CCDIK.h"
-#include "AnimGraphNode_CCDIK.generated.h"
+#include "AnimNode_CCDIKPractice.h"
+#include "AnimGraphNode_CCDIKPractice.generated.h"
 
 /**
  * 
  */
 UCLASS(MinimalAPI)
-class UAnimGraphNode_CCDIK : public UAnimGraphNode_SkeletalControlBase
+class UAnimGraphNode_CCDIKPractice : public UAnimGraphNode_SkeletalControlBase
 {
 	GENERATED_UCLASS_BODY()
 	
 	UPROPERTY(EditAnywhere, Category=Settings)
-	FAnimNode_CCDIK Node;
+	FAnimNode_CCDIKPractice Node;
 	
 public:
 	// UEdGraphNode interface
