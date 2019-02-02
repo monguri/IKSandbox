@@ -23,7 +23,7 @@ struct IKPLUGINSANDBOX_API FAnimNode_SkeletalControlBaseLocal : public FAnimNode
 
 	// Input link
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Links)
-	FComponentSpacePoseLink ComponentPose;
+	FPoseLink Pose;
 
 	/*
 	* Max LOD that this node is allowed to run
@@ -73,16 +73,11 @@ public:
 	}
 
 public:
-#if WITH_EDITORONLY_DATA
-	// forwarded pose data from the wired node which current node's skeletal control is not applied yet
-	FCSPose<FCompactHeapPose> ForwardedPose;
-#endif //#if WITH_EDITORONLY_DATA
-
 	// FAnimNode_Base interface
 	virtual void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
 	virtual void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context)  override;
 	virtual void Update_AnyThread(const FAnimationUpdateContext& Context) final;
-	virtual void EvaluateComponentSpace_AnyThread(FComponentSpacePoseContext& Output) final;
+	virtual void Evaluate_AnyThread(FPoseContext& Output) final;
 	// End of FAnimNode_Base interface
 
 protected:
@@ -90,16 +85,10 @@ protected:
 	// use this function to update for skeletal control base
 	virtual void UpdateInternal(const FAnimationUpdateContext& Context);
 
-	// Update incoming component pose.
-	virtual void UpdateComponentPose_AnyThread(const FAnimationUpdateContext& Context);
-
-	// Evaluate incoming component pose.
-	virtual void EvaluateComponentPose_AnyThread(FComponentSpacePoseContext& Output);
-
 	// use this function to evaluate for skeletal control base
-	virtual void EvaluateComponentSpaceInternal(FComponentSpacePoseContext& Context);
-	// Evaluate the new component-space transforms for the affected bones.
-	virtual void EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms);
+	virtual void EvaluateInternal(FPoseContext& Output);
+	// Evaluate the new local-space transforms for the affected bones.
+	virtual void EvaluateSkeletalControl_AnyThread(const FCSPose<FCompactPose>& InPose, FPoseContext& Output);
 	// return true if it is valid to Evaluate
 	virtual bool IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones) { return false; }
 	// initialize any bone references you have
@@ -107,8 +96,4 @@ protected:
 
 	/** Allow base to add info to the node debug output */
 	void AddDebugNodeData(FString& OutDebugData);
-private:
-
-	// Resused bone transform array to avoid reallocating in skeletal controls
-	TArray<FBoneTransform> BoneTransforms;
 };
