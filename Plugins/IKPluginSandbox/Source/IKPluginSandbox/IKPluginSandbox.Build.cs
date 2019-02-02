@@ -43,6 +43,7 @@ public class IKPluginSandbox : ModuleRules
 				"AnimGraph",
 				"AnimGraphRuntime",
 				"BlueprintGraph",
+				"UnrealEd",
 			}
 			);
 		
