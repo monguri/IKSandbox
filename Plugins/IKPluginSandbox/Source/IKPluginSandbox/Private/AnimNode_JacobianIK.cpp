@@ -443,6 +443,8 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 	// EffectorJointから、IKRootJointまで、IKRootJointにぶつからなければルートジョイントまでワークデータを持たせる
 	FCompactPoseBoneIndex IKJointIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
 
+	IKJointWorkDatas.Reset(IKJointWorkDatas.Num());
+
 	while (IKJointIndex != INDEX_NONE && IKJointIndex != IKRootJoint.BoneIndex)
 	{
 		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
