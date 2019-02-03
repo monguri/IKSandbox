@@ -426,8 +426,17 @@ bool FAnimNode_JacobianIK::IsValidToEvaluate(const USkeleton* Skeleton, const FB
 
 void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& RequiredBones)
 {
-	IKRootJoint.Initialize(RequiredBones);
+	bool Success = IKRootJoint.Initialize(RequiredBones);
+	if (!Success)
+	{
+		return;
+	}
+
 	EffectorJoint.Initialize(RequiredBones);
+	if (!Success)
+	{
+		return;
+	}
 
 	IKRootJointParent = FCompactPoseBoneIndex(RequiredBones.GetParentBoneIndex(IKRootJoint.BoneIndex));
 
