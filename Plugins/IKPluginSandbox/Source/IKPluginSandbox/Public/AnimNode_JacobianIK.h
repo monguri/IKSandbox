@@ -38,12 +38,6 @@ struct IKPLUGINSANDBOX_API FAnimNode_JacobianIK : public FAnimNode_SkeletalContr
 
 	FAnimNode_JacobianIK();
 
-public:
-	// FAnimNode_SkeletalControlBase interface
-	virtual void EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms) override;
-	virtual bool IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones) override;
-	// End of FAnimNode_SkeletalControlBase interface
-
 private:
 	struct IKJointWorkData
 	{
@@ -89,6 +83,8 @@ private:
 	TArray<float> IterationStepAngles;
 
 	// FAnimNode_SkeletalControlBase interface
+	virtual void EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms) override;
+	virtual bool IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones) override;
 	virtual void InitializeBoneReferences(const FBoneContainer& RequiredBones) override;
 	// End of FAnimNode_SkeletalControlBase interface
 };
