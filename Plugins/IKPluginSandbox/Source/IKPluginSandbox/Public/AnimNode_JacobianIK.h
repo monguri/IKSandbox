@@ -5,7 +5,10 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "BoneControllers/AnimNode_SkeletalControlBase.h"
+#include "JacobianIKUtility.h"
 #include "AnimNode_JacobianIK.generated.h"
+
+using namespace JacobianIKUtility;
 
 USTRUCT(BlueprintInternalUseOnly)
 struct IKPLUGINSANDBOX_API FAnimNode_JacobianIK : public FAnimNode_SkeletalControlBase
@@ -50,24 +53,6 @@ private:
 	};
 
 	TArray<IKJointWorkData> IKJointWorkDatas;
-
-	struct AnySizeMatrix
-	{
-		AnySizeMatrix();
-		AnySizeMatrix(uint8 _NumRow, uint8 _NumColumn);
-		float Get(uint8 Row, uint8 Column) const;
-		void Set(uint8 Row, uint8 Column, float Value);
-		void ZeroClear();
-		static void Transpose(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
-		static void Multiply(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
-		static void Add(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
-		static float Inverse3x3(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
-		static void TransformVector(const AnySizeMatrix& InMatrix, const TArray<float>& InVector, TArray<float>& OutVector);
-
-		TArray<float> Elements; // 1-dimensional array for access speed.
-		uint8 NumRow;
-		uint8 NumColumn;
-	};
 
 	// Parent joint of ik root joint
 	FCompactPoseBoneIndex IKRootJointParent;
