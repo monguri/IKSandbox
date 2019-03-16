@@ -210,6 +210,84 @@ FAnimNode_JacobianIK::FAnimNode_JacobianIK()
 {
 }
 
+void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& RequiredBones)
+{
+	bool Success = IKRootJoint.Initialize(RequiredBones);
+	if (!Success)
+	{
+		return;
+	}
+
+	EffectorJoint.Initialize(RequiredBones);
+	if (!Success)
+	{
+		return;
+	}
+
+	IKRootJointParent = FCompactPoseBoneIndex(RequiredBones.GetParentBoneIndex(IKRootJoint.BoneIndex));
+
+	// EffectorJointから、IKRootJointまで、IKRootJointにぶつからなければルートジョイントまでワークデータを持たせる
+	FCompactPoseBoneIndex IKJointIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
+
+	IKJointWorkDatas.Reset(IKJointWorkDatas.Num());
+
+	while (IKJointIndex != INDEX_NONE && IKJointIndex != IKRootJoint.BoneIndex)
+	{
+		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
+
+		IKJointIndex = RequiredBones.GetParentBoneIndex(IKJointIndex);
+	}
+
+	if (IKJointIndex == IKRootJoint.BoneIndex)
+	{
+		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
+	}
+
+	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT, AXIS_COUNT);
+	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
+	JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
+
+	LambdaI = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // lambda * I
+	LambdaI.ZeroClear();
+	LambdaI.Set(0, 0, Lambda);
+	LambdaI.Set(1, 1, Lambda);
+	LambdaI.Set(2, 2, Lambda);
+
+	JJtPlusLambdaI = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * J^t + lambda * I
+	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J * J^t + lambda * I)^-1
+	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT); // J^t * (J * J^t)^-1
+
+	IterationStepPosition.SetNumZeroed(AXIS_COUNT);
+	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
+}
+
+bool FAnimNode_JacobianIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
+{
+	if (!IKRootJoint.IsValidToEvaluate(RequiredBones))
+	{
+		return false;
+	}
+
+	if (!EffectorJoint.IsValidToEvaluate(RequiredBones))
+	{
+		return false;
+	}
+
+	FCompactPoseBoneIndex ParentIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
+	while (ParentIndex != INDEX_NONE && ParentIndex != IKRootJoint.BoneIndex)
+	{
+		ParentIndex = RequiredBones.GetParentBoneIndex(ParentIndex);
+	}
+
+	if (ParentIndex == INDEX_NONE)
+	{
+		// IKRootJointとEffectorJointが先祖子孫関係になってない
+		return false;
+	}
+
+	return (IKJointWorkDatas.Num() >= 2); // 最低限エフェクタと、一つIK制御ジョイントがないと意味がない
+}
+
 void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
 {
 	check(Output.AnimInstanceProxy->GetSkelMeshComponent());
@@ -397,80 +475,3 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 	}
 }
 
-bool FAnimNode_JacobianIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
-{
-	if (!IKRootJoint.IsValidToEvaluate(RequiredBones))
-	{
-		return false;
-	}
-
-	if (!EffectorJoint.IsValidToEvaluate(RequiredBones))
-	{
-		return false;
-	}
-
-	FCompactPoseBoneIndex ParentIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
-	while (ParentIndex != INDEX_NONE && ParentIndex != IKRootJoint.BoneIndex)
-	{
-		ParentIndex = RequiredBones.GetParentBoneIndex(ParentIndex);
-	}
-
-	if (ParentIndex == INDEX_NONE)
-	{
-		// IKRootJointとEffectorJointが先祖子孫関係になってない
-		return false;
-	}
-
-	return (IKJointWorkDatas.Num() >= 2); // 最低限エフェクタと、一つIK制御ジョイントがないと意味がない
-}
-
-void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& RequiredBones)
-{
-	bool Success = IKRootJoint.Initialize(RequiredBones);
-	if (!Success)
-	{
-		return;
-	}
-
-	EffectorJoint.Initialize(RequiredBones);
-	if (!Success)
-	{
-		return;
-	}
-
-	IKRootJointParent = FCompactPoseBoneIndex(RequiredBones.GetParentBoneIndex(IKRootJoint.BoneIndex));
-
-	// EffectorJointから、IKRootJointまで、IKRootJointにぶつからなければルートジョイントまでワークデータを持たせる
-	FCompactPoseBoneIndex IKJointIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
-
-	IKJointWorkDatas.Reset(IKJointWorkDatas.Num());
-
-	while (IKJointIndex != INDEX_NONE && IKJointIndex != IKRootJoint.BoneIndex)
-	{
-		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
-
-		IKJointIndex = RequiredBones.GetParentBoneIndex(IKJointIndex);
-	}
-
-	if (IKJointIndex == IKRootJoint.BoneIndex)
-	{
-		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
-	}
-
-	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT, AXIS_COUNT);
-	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
-	JJt = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * Jt
-
-	LambdaI = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // lambda * I
-	LambdaI.ZeroClear();
-	LambdaI.Set(0, 0, Lambda);
-	LambdaI.Set(1, 1, Lambda);
-	LambdaI.Set(2, 2, Lambda);
-
-	JJtPlusLambdaI = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // J * J^t + lambda * I
-	JJti = AnySizeMatrix(AXIS_COUNT, AXIS_COUNT); // (J * J^t + lambda * I)^-1
-	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT); // J^t * (J * J^t)^-1
-
-	IterationStepPosition.SetNumZeroed(AXIS_COUNT);
-	IterationStepAngles.SetNumZeroed((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
-}
