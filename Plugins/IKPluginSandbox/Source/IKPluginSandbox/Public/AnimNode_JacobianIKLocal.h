@@ -86,6 +86,6 @@ private:
 	// FAnimNode_SkeletalControlBaseLocal interface
 	virtual void InitializeBoneReferences(const FBoneContainer& RequiredBones) override;
 	virtual bool IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones) override;
-	virtual void EvaluateSkeletalControl_AnyThread(const FCSPose<FCompactPose>& InPose, FPoseContext& Output) override;
+	virtual void EvaluateSkeletalControl_AnyThread(FCSPose<FCompactPose>& InPose, FPoseContext& Output) override;
 	// End of FAnimNode_SkeletalControlBaseLocal interface
 };
