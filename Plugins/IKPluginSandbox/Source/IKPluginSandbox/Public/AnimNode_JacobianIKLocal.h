@@ -40,6 +40,10 @@ struct IKPLUGINSANDBOX_API FAnimNode_JacobianIKLocal : public FAnimNode_Skeletal
 	UPROPERTY(EditAnywhere, Category=IK)
 	float Lambda;
 
+	/** Toggle debug draw. */
+	UPROPERTY(EditAnywhere, Category=Debug)
+	bool bDebugDraw;
+
 	FAnimNode_JacobianIKLocal();
 
 private:

@@ -2,6 +2,7 @@
 
 #include "AnimNode_JacobianIKLocal.h"
 #include "Animation/AnimInstanceProxy.h"
+#include "DrawDebugHelpers.h"
 
 FAnimNode_JacobianIKLocal::FAnimNode_JacobianIKLocal()
 	: EffectorTargetLocation(0.0f, 0.0f, 0.0f)
@@ -9,6 +10,7 @@ FAnimNode_JacobianIKLocal::FAnimNode_JacobianIKLocal()
 	, Precision(SMALL_NUMBER)
 	, IKRootJointParent(INDEX_NONE)
 	, Lambda(0.0f)
+	, bDebugDraw(false)
 {
 }
 
@@ -120,6 +122,42 @@ void FAnimNode_JacobianIKLocal::EvaluateSkeletalControl_AnyThread(FCSPose<FCompa
 	{
 		WorkData.ComponentTransform = InPose.GetComponentSpaceTransform(WorkData.BoneIndex);
 	}
+
+#if ENABLE_DRAW_DEBUG
+	if (bDebugDraw)
+	{
+		const UWorld* World = Output.AnimInstanceProxy->GetSkelMeshComponent()->GetWorld();
+		const FTransform& ComponenToWorld = Output.AnimInstanceProxy->GetSkelMeshComponent()->GetComponentToWorld();
+
+		for (int32 i = 0; i < IKJointWorkDatas.Num(); ++i)
+		{
+			if (i >= 1)
+			{
+				DrawDebugLine(
+					World,
+					ComponenToWorld.TransformPosition(InPose.GetComponentSpaceTransform(IKJointWorkDatas[i - 1].BoneIndex).GetLocation()),
+					ComponenToWorld.TransformPosition(InPose.GetComponentSpaceTransform(IKJointWorkDatas[i].BoneIndex).GetLocation()),
+					FColor::Red,
+					false,
+					-1.0f,
+					SDPG_Foreground,
+					1.0f
+				);
+			}
+
+			DrawDebugBox(
+				World,
+				ComponenToWorld.TransformPosition(InPose.GetComponentSpaceTransform(IKJointWorkDatas[i].BoneIndex).GetLocation()),
+				FVector(1.0f),
+				FColor::Red,
+				false,
+				-1.0f,
+				SDPG_Foreground,
+				1.0f
+			);
+		}
+	}
+#endif
 
 	// ノードの入力されたエフェクタの位置から目標位置への差分ベクトル
 	const FVector& DeltaLocation = EffectorTargetLocation - InPose.GetComponentSpaceTransform(IKJointWorkDatas[0].BoneIndex).GetLocation();
