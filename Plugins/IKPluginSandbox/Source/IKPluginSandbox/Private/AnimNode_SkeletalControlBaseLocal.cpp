@@ -11,7 +11,7 @@ void FAnimNode_SkeletalControlBaseLocal::Initialize_AnyThread(const FAnimationIn
 {
 	FAnimNode_Base::Initialize_AnyThread(Context);
 
-	Pose.Initialize(Context);
+	Source.Initialize(Context);
 
 	AlphaBoolBlend.Reinitialize();
 	AlphaScaleBiasClamp.Reinitialize();
@@ -21,7 +21,7 @@ void FAnimNode_SkeletalControlBaseLocal::CacheBones_AnyThread(const FAnimationCa
 {
 	FAnimNode_Base::CacheBones_AnyThread(Context);
 	InitializeBoneReferences(Context.AnimInstanceProxy->GetRequiredBones());
-	Pose.CacheBones(Context);
+	Source.CacheBones(Context);
 }
 
 void FAnimNode_SkeletalControlBaseLocal::UpdateInternal(const FAnimationUpdateContext& Context)
@@ -30,7 +30,7 @@ void FAnimNode_SkeletalControlBaseLocal::UpdateInternal(const FAnimationUpdateCo
 
 void FAnimNode_SkeletalControlBaseLocal::Update_AnyThread(const FAnimationUpdateContext& Context)
 {
-	Pose.Update(Context);
+	Source.Update(Context);
 
 	ActualAlpha = 0.f;
 	if (IsLODEnabled(Context.AnimInstanceProxy))
@@ -83,7 +83,7 @@ void FAnimNode_SkeletalControlBaseLocal::EvaluateInternal(FPoseContext& Output)
 
 void FAnimNode_SkeletalControlBaseLocal::Evaluate_AnyThread(FPoseContext& Output)
 {
-	Pose.Evaluate(Output);
+	Source.Evaluate(Output);
 
 	// save current pose before applying skeletal control to compute the exact gizmo location in AnimGraphNode
 	// forwarded pose data from the wired node which current node's skeletal control is not applied yet
@@ -106,7 +106,7 @@ void FAnimNode_SkeletalControlBaseLocal::AddDebugNodeData(FString& OutDebugData)
 	OutDebugData += FString::Printf(TEXT("Alpha: %.1f%%"), ActualAlpha*100.f);
 }
 
-void FAnimNode_SkeletalControlBaseLocal::EvaluateSkeletalControl_AnyThread(const FCSPose<FCompactPose>& InPose, FPoseContext& Output)
+void FAnimNode_SkeletalControlBaseLocal::EvaluateSkeletalControl_AnyThread(FCSPose<FCompactPose>& Source, FPoseContext& Output)
 {
 }
 

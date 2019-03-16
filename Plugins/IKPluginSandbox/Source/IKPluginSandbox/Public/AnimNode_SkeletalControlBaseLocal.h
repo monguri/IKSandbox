@@ -23,7 +23,7 @@ struct IKPLUGINSANDBOX_API FAnimNode_SkeletalControlBaseLocal : public FAnimNode
 
 	// Input link
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Links)
-	FPoseLink Pose;
+	FPoseLink Source;
 
 	/*
 	* Max LOD that this node is allowed to run
@@ -88,7 +88,7 @@ protected:
 	// use this function to evaluate for skeletal control base
 	virtual void EvaluateInternal(FPoseContext& Output);
 	// Evaluate the new local-space transforms for the affected bones.
-	virtual void EvaluateSkeletalControl_AnyThread(const FCSPose<FCompactPose>& InPose, FPoseContext& Output);
+	virtual void EvaluateSkeletalControl_AnyThread(FCSPose<FCompactPose>& Source, FPoseContext& Output);
 	// return true if it is valid to Evaluate
 	virtual bool IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones) { return false; }
 	// initialize any bone references you have
