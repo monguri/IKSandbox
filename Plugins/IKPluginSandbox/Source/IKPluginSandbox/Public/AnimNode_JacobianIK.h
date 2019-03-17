@@ -10,18 +10,45 @@
 
 using namespace JacobianIKUtility;
 
+USTRUCT()
+struct FIKConstraint
+{
+	//TODO: JacobianIKUtility.hの中に置きたかったがコンパイルエラーを解消できずしょうがなく
+	GENERATED_USTRUCT_BODY()
+
+	/** fixed position constraint. **/
+	UPROPERTY(EditAnywhere)
+	FVector Position; // 今のところ位置のコンストレイントだけ。今後増やす
+};
+
+USTRUCT()
+struct FIKJoint
+{
+	//TODO: JacobianIKUtility.hの中に置きたかったがコンパイルエラーを解消できずしょうがなく
+	GENERATED_USTRUCT_BODY()
+
+	/** target joint of constraint. **/
+	UPROPERTY(EditAnywhere)
+	FBoneReference Joint;
+
+	/** parent joint of target joint. If it equals target joint, it is treated as root joint. **/
+	UPROPERTY(EditAnywhere)
+	FBoneReference ParentJoint; //TODO: parentをわざわざ指定させるというのはあまりきれいなやり方ではない
+
+	/** constraints. **/
+	UPROPERTY(EditAnywhere)
+	TArray<FIKConstraint> Constraints;
+};
+
 USTRUCT(BlueprintInternalUseOnly)
 struct IKPLUGINSANDBOX_API FAnimNode_JacobianIK : public FAnimNode_SkeletalControlBase
 {
 	GENERATED_USTRUCT_BODY()
 
-	/** Name of ik start joint. **/
+public:
+	/** Joints which are calculated by IK. **/
 	UPROPERTY(EditAnywhere, Category=IK)
-	FBoneReference IKRootJoint;
-
-	/** Name of ik effector joint. **/
-	UPROPERTY(EditAnywhere, Category=IK)
-	FBoneReference EffectorJoint;
+	TArray<FIKJoint> IKSkeleton;
 
 	/** Effector Target Location. Component space. **/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=IK, meta=(PinShownByDefault))
@@ -47,9 +74,10 @@ private:
 		FCompactPoseBoneIndex BoneIndex;
 		FTransform ComponentTransform;
 		FTransform LocalTransform;
+		TArray<FIKConstraint> Constraints;
 
 		IKJointWorkData() : BoneIndex(INDEX_NONE), ComponentTransform(FTransform::Identity), LocalTransform(FTransform::Identity) {}
-		IKJointWorkData(FCompactPoseBoneIndex _BoneIndex, const FTransform& _ComponentTransform, const FTransform& _LocalTransform) : BoneIndex(_BoneIndex), ComponentTransform(_ComponentTransform), LocalTransform(_LocalTransform) {}
+		IKJointWorkData(FCompactPoseBoneIndex _BoneIndex, const FTransform& _ComponentTransform, const FTransform& _LocalTransform, const TArray<FIKConstraint> _Constraints) : BoneIndex(_BoneIndex), ComponentTransform(_ComponentTransform), LocalTransform(_LocalTransform), Constraints(_Constraints) {}
 	};
 
 	TArray<IKJointWorkData> IKJointWorkDatas;

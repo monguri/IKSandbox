@@ -4,8 +4,7 @@
 #include "Animation/AnimInstanceProxy.h"
 
 FAnimNode_JacobianIK::FAnimNode_JacobianIK()
-	: EffectorTargetLocation(0.0f, 0.0f, 0.0f)
-	, NumIteration(10)
+	: NumIteration(10)
 	, Precision(SMALL_NUMBER)
 	, IKRootJointParent(INDEX_NONE)
 	, Lambda(0.0f)
@@ -14,36 +13,40 @@ FAnimNode_JacobianIK::FAnimNode_JacobianIK()
 
 void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& RequiredBones)
 {
-	bool Success = IKRootJoint.Initialize(RequiredBones);
-	if (!Success)
+	for (FIKJoint& IKJoint : IKSkeleton)
 	{
-		return;
+		bool Success = IKJoint.Joint.Initialize(RequiredBones);
+		if (!Success)
+		{
+			// TODO:UE_LOG
+			return;
+		}
+
+		Success = IKJoint.ParentJoint.Initialize(RequiredBones);
+		if (!Success)
+		{
+			// TODO:UE_LOG
+			return;
+		}
+
+		check(IKJoint.Joint.BoneIndex != INDEX_NONE);
+		check(IKJoint.ParentJoint.BoneIndex != INDEX_NONE);
+		// TODO:IKSkeleton内のジョイントの重複チェックもしないとな
 	}
-
-	EffectorJoint.Initialize(RequiredBones);
-	if (!Success)
-	{
-		return;
-	}
-
-	IKRootJointParent = FCompactPoseBoneIndex(RequiredBones.GetParentBoneIndex(IKRootJoint.BoneIndex));
-
-	// EffectorJointから、IKRootJointまで、IKRootJointにぶつからなければルートジョイントまでワークデータを持たせる
-	FCompactPoseBoneIndex IKJointIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
 
 	IKJointWorkDatas.Reset(IKJointWorkDatas.Num());
 
-	while (IKJointIndex != INDEX_NONE && IKJointIndex != IKRootJoint.BoneIndex)
+	for (const FIKJoint& IKJoint : IKSkeleton)
 	{
-		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
-
-		IKJointIndex = RequiredBones.GetParentBoneIndex(IKJointIndex);
+		IKJointWorkDatas.Emplace(IKJoint.Joint.GetCompactPoseIndex(RequiredBones), FTransform::Identity, FTransform::Identity, IKJoint.Constraints);
 	}
 
-	if (IKJointIndex == IKRootJoint.BoneIndex)
-	{
-		IKJointWorkDatas.Emplace(IKJointIndex, FTransform::Identity, FTransform::Identity);
-	}
+	IKJointWorkDatas.StableSort(
+		[](const IKJointWorkData& A, const IKJointWorkData& B)
+		{
+			return A.BoneIndex >= B.BoneIndex;
+		}
+	);
 
 	Jacobian = AnySizeMatrix((IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT, AXIS_COUNT);
 	Jt = AnySizeMatrix(AXIS_COUNT, (IKJointWorkDatas.Num() - 1) * ROTATION_AXIS_COUNT);
@@ -65,26 +68,17 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 
 bool FAnimNode_JacobianIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
 {
-	if (!IKRootJoint.IsValidToEvaluate(RequiredBones))
+	for (FIKJoint& IKJoint : IKSkeleton)
 	{
-		return false;
-	}
+		if (!IKJoint.Joint.IsValidToEvaluate(RequiredBones))
+		{
+			return false;
+		}
 
-	if (!EffectorJoint.IsValidToEvaluate(RequiredBones))
-	{
-		return false;
-	}
-
-	FCompactPoseBoneIndex ParentIndex = EffectorJoint.GetCompactPoseIndex(RequiredBones);
-	while (ParentIndex != INDEX_NONE && ParentIndex != IKRootJoint.BoneIndex)
-	{
-		ParentIndex = RequiredBones.GetParentBoneIndex(ParentIndex);
-	}
-
-	if (ParentIndex == INDEX_NONE)
-	{
-		// IKRootJointとEffectorJointが先祖子孫関係になってない
-		return false;
+		if (!IKJoint.ParentJoint.IsValidToEvaluate(RequiredBones))
+		{
+			return false;
+		}
 	}
 
 	return (IKJointWorkDatas.Num() >= 2); // 最低限エフェクタと、一つIK制御ジョイントがないと意味がない
@@ -99,6 +93,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 	// TODO:各IKノードと共通化しよう
 	// そもそもジョイントの長さ的にIKの解に到達しうるかの確認
+
 	float EffectorToIKRootLength = (Output.Pose.GetComponentSpaceTransform(IKJointWorkDatas.Last().BoneIndex).GetLocation() - Output.Pose.GetComponentSpaceTransform(IKJointWorkDatas[0].BoneIndex).GetLocation()).Size();
 	float IKJointTotalLength = 0; // アニメーションにScaleがないなら、一度だけ計算してキャッシュしておけばよいが、今は毎回計算する
 	for (int32 i = 1; i < IKJointWorkDatas.Num(); ++i)
