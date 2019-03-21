@@ -50,10 +50,6 @@ public:
 	UPROPERTY(EditAnywhere, Category=IK)
 	TArray<FIKJoint> IKSkeleton;
 
-	/** Effector Target Location. Component space. **/
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=IK, meta=(PinShownByDefault))
-	FVector EffectorTargetLocation;
-
 	/** The number of iteration. **/
 	UPROPERTY(EditAnywhere, Category=IK)
 	uint32 NumIteration;
@@ -71,19 +67,16 @@ public:
 private:
 	struct IKJointWorkData
 	{
-		FCompactPoseBoneIndex BoneIndex;
+		FCompactPoseBoneIndex ParentJointIndex; // TODO:JointIndex‚É–¼‘O‚ð•Ï‚¦‚½‚¢
 		FTransform ComponentTransform;
 		FTransform LocalTransform;
 		TArray<FIKConstraint> Constraints;
 
-		IKJointWorkData() : BoneIndex(INDEX_NONE), ComponentTransform(FTransform::Identity), LocalTransform(FTransform::Identity) {}
-		IKJointWorkData(FCompactPoseBoneIndex _BoneIndex, const FTransform& _ComponentTransform, const FTransform& _LocalTransform, const TArray<FIKConstraint> _Constraints) : BoneIndex(_BoneIndex), ComponentTransform(_ComponentTransform), LocalTransform(_LocalTransform), Constraints(_Constraints) {}
+		IKJointWorkData() : ParentJointIndex(INDEX_NONE), ComponentTransform(FTransform::Identity), LocalTransform(FTransform::Identity) {}
+		IKJointWorkData(FCompactPoseBoneIndex _ParentJointIndex, const FTransform& _ComponentTransform, const FTransform& _LocalTransform, const TArray<FIKConstraint> _Constraints) : ParentJointIndex(_ParentJointIndex), ComponentTransform(_ComponentTransform), LocalTransform(_LocalTransform), Constraints(_Constraints) {}
 	};
 
-	TArray<IKJointWorkData> IKJointWorkDatas;
-
-	// Parent joint of ik root joint
-	FCompactPoseBoneIndex IKRootJointParent;
+	TMap<int32, IKJointWorkData> IKJointWorkDataMap;
 
 	AnySizeMatrix Jacobian;
 	AnySizeMatrix Jt;
