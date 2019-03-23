@@ -19,6 +19,10 @@ struct FIKConstraint
 	/** fixed position constraint. **/
 	UPROPERTY(EditAnywhere)
 	FVector Position; // 今のところ位置のコンストレイントだけ。今後増やす
+
+	/** root joint of joints chain which effects to this IK constraint. **/
+	UPROPERTY(EditAnywhere)
+	FBoneReference EffectiveRootJoint; // 今のところ位置のコンストレイントだけ。今後増やす
 };
 
 USTRUCT()
@@ -67,16 +71,33 @@ public:
 private:
 	struct IKJointWorkData
 	{
-		FCompactPoseBoneIndex ParentJointIndex; // TODO:JointIndexに名前を変えたい
+		/** parent joint index of this joint. If it equals this joint index, it is treated as root joint. **/
+		FCompactPoseBoneIndex ParentJointIndex;
+		/** Component space transform work data. **/
 		FTransform ComponentTransform;
+		/** Local space transform work data. **/
 		FTransform LocalTransform;
-		TArray<FIKConstraint> Constraints;
 
 		IKJointWorkData() : ParentJointIndex(INDEX_NONE), ComponentTransform(FTransform::Identity), LocalTransform(FTransform::Identity) {}
-		IKJointWorkData(FCompactPoseBoneIndex _ParentJointIndex, const FTransform& _ComponentTransform, const FTransform& _LocalTransform, const TArray<FIKConstraint> _Constraints) : ParentJointIndex(_ParentJointIndex), ComponentTransform(_ComponentTransform), LocalTransform(_LocalTransform), Constraints(_Constraints) {}
+		IKJointWorkData(const FCompactPoseBoneIndex& _ParentJointIndex, const FTransform& _ComponentTransform, const FTransform& _LocalTransform, const TArray<FIKConstraint> _Constraints) : ParentJointIndex(_ParentJointIndex), ComponentTransform(_ComponentTransform), LocalTransform(_LocalTransform) {}
+	};
+
+	struct IKConstraintWorkData
+	{
+		/** target joint index of constraint. **/
+		FCompactPoseBoneIndex JointIndex;
+		/** joints chain indices which effects to this IK constraint. It does not include self joint. **/
+		TArray<FCompactPoseBoneIndex> EffectiveJointIndices; // このコンストレイントIK計算を行う
+		/** constraint position **/
+		FVector Position;
+
+		IKConstraintWorkData(const FCompactPoseBoneIndex& _JointIndex, const TArray<FCompactPoseBoneIndex>& _EffectiveJointIndices, const FVector& _Position) : JointIndex(_JointIndex), EffectiveJointIndices(_EffectiveJointIndices), Position(_Position) {};
 	};
 
 	TMap<int32, IKJointWorkData> IKJointWorkDataMap;
+	TArray<IKConstraintWorkData> IKConstraintWorkDataArray;
+
+	bool bValidToEvaluate;
 
 	AnySizeMatrix Jacobian;
 	AnySizeMatrix Jt;
