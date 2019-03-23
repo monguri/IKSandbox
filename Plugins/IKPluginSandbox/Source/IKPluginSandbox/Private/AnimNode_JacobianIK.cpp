@@ -234,8 +234,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				IKJointWorkData& WorkData = WorkDataPair.Value;
 				const FCompactPoseBoneIndex& JointIndex = FCompactPoseBoneIndex(WorkDataPair.Key);
 
-				for (const IKConstraintWorkData& Constraint : IKConstraintWorkDataArray)
+				for (int32 ConstraintIndex = 0; ConstraintIndex < IKConstraintWorkDataArray.Num(); ConstraintIndex++)
 				{
+					const IKConstraintWorkData& Constraint = IKConstraintWorkDataArray[ConstraintIndex];
 					bool bEffectiveJoint = false;
 					for (const FCompactPoseBoneIndex& EffectiveJoint : Constraint.EffectiveJointIndices)
 					{
@@ -301,9 +302,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 						for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
 						{
 							const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, 0, JacobianRow.X);
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, 1, JacobianRow.Y);	
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, 2, JacobianRow.Z);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 0, JacobianRow.X);
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 1, JacobianRow.Y);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 2, JacobianRow.Z);	
 						}
 					}
 					else
@@ -311,14 +312,14 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 						// このジョイントがこのコンストレイントに影響を及ぼすジョイントでないときはヤコビアンの要素は0
 						for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
 						{
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, 0, 0.0f);
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, 1, 0.0f);	
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, 2, 0.0f);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 0, 0.0f);
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 1, 0.0f);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 2, 0.0f);	
 						}
 					}
-
-					RotationIndex++;
 				}
+
+				RotationIndex++;
 			}
 		}
 
