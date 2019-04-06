@@ -256,7 +256,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 					if (bEffectiveJoint)
 					{
 						FTransform LocalTransform;
-						if (JointIndex == WorkData.ParentJointIndex) // IKルートジョイントのとき
+						if (JointIndex == WorkData.ParentJointIndex) // IKルートジョイントのときは、LocalTransformは通常のスケルトンのLocalTransrormと同じ
 						{
 							if (JointIndex.IsRootBone()) // IKルートジョイントがスケルトンのルートのとき
 							{
@@ -267,7 +267,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 								WorkData.LocalTransform = WorkData.ComponentTransform * Output.Pose.GetComponentSpaceTransform(BoneContainer.GetParentBoneIndex(JointIndex)).Inverse(); 
 							}
 						}
-						else
+						else // IKルートジョイントのときは、LocalTransformはIKスケルトン基準で計算する
 						{
 							const IKJointWorkData& ParentWorkData = IKJointWorkDataMap[WorkData.ParentJointIndex.GetInt()];
 							WorkData.LocalTransform = WorkData.ComponentTransform * ParentWorkData.ComponentTransform.Inverse();
@@ -386,7 +386,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 				FTransform ParentTransform;
 
-				if (JointIndex == WorkData.ParentJointIndex) // IKルートジョイントのとき
+				if (JointIndex == WorkData.ParentJointIndex) // IKルートジョイントのときは、ComponentTransformは通常のスケルトンのComponentTransformと同じ
 				{
 					if (JointIndex.IsRootBone()) // IKルートジョイントがスケルトンのルートのとき
 					{
@@ -397,7 +397,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 						ParentTransform = Output.Pose.GetComponentSpaceTransform(BoneContainer.GetParentBoneIndex(JointIndex));
 					}
 				}
-				else
+				else // IKルートジョイントのときは、ComponentTransformはIKスケルトン基準で計算する
 				{
 					const IKJointWorkData& ParentWorkData = IKJointWorkDataMap[WorkData.ParentJointIndex.GetInt()];
 					ParentTransform = ParentWorkData.ComponentTransform;
