@@ -178,9 +178,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 	// TODO:各IKノードと共通化しよう
 	// そもそもジョイントの長さ的にIKの解に到達しうるかの確認
 	// コンストレイントごとに確認する
-	int32 ConstraintIndex = 0;
-	for (const IKConstraintWorkData& Constraint : IKConstraintWorkDataArray)
+	for (int32 ConstraintIndex = 0; ConstraintIndex < IKConstraintWorkDataArray.Num(); ConstraintIndex++)
 	{
+		const IKConstraintWorkData& Constraint = IKConstraintWorkDataArray[ConstraintIndex];
 		float IKJointTotalLength = 0; // このアニメーションノードに入力されるポーズにScaleがないなら、一度だけ計算してキャッシュしておけばよいが、今は毎回計算する
 		// TODO:だがチェック処理にしては毎フレームの計算コスト高すぎかも
 
@@ -204,10 +204,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 		// 毎イテレーションでの位置移動
 		const FVector& IterationStep = DeltaLocation / NumIteration;
-		IterationStepPosition[ConstraintIndex + 0] = IterationStep.X;
-		IterationStepPosition[ConstraintIndex + 1] = IterationStep.Y;
-		IterationStepPosition[ConstraintIndex + 2] = IterationStep.Z;
-		ConstraintIndex++;
+		IterationStepPosition[ConstraintIndex * AXIS_COUNT + 0] = IterationStep.X;
+		IterationStepPosition[ConstraintIndex * AXIS_COUNT + 1] = IterationStep.Y;
+		IterationStepPosition[ConstraintIndex * AXIS_COUNT + 2] = IterationStep.Z;
 	}
 
 	// ワークデータのTransformの初期化
@@ -302,9 +301,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 						for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
 						{
 							const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 0, JacobianRow.X);
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 1, JacobianRow.Y);	
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 2, JacobianRow.Z);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 0, JacobianRow.X);
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 1, JacobianRow.Y);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 2, JacobianRow.Z);	
 						}
 					}
 					else
@@ -312,9 +311,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 						// このジョイントがこのコンストレイントに影響を及ぼすジョイントでないときはヤコビアンの要素は0
 						for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
 						{
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 0, 0.0f);
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 1, 0.0f);	
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex + 2, 0.0f);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 0, 0.0f);
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 1, 0.0f);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 2, 0.0f);	
 						}
 					}
 				}
