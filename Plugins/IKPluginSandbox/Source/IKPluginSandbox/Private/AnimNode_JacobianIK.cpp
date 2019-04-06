@@ -44,6 +44,7 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 			// EffectiveRootJointはすでにどれかのFIKJointで指定されておりInitializeされているはず
 			if (!IKConstraint.EffectiveRootJoint.Initialize(RequiredBones))
 			{
+				// TODO:UE_LOG
 				return;
 			}
 		}
@@ -56,11 +57,13 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 	{
 		if (!IKJoint.Joint.IsValidToEvaluate(RequiredBones))
 		{
+			// TODO:UE_LOG
 			return;
 		}
 
 		if (!IKJoint.ParentJoint.IsValidToEvaluate(RequiredBones))
 		{
+			// TODO:UE_LOG
 			return;
 		}
 
@@ -69,6 +72,7 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 			NumRootIKJoint++;
 			if (NumRootIKJoint > 1)
 			{
+				// TODO:UE_LOG
 				return;
 			}
 		}
@@ -93,6 +97,7 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 		{
 			if (!IKConstraint.EffectiveRootJoint.IsValidToEvaluate(RequiredBones))
 			{
+				// TODO:UE_LOG
 				return;
 			}
 
@@ -100,6 +105,7 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 			const FCompactPoseBoneIndex& EffectiveRootIndex = IKConstraint.EffectiveRootJoint.GetCompactPoseIndex(RequiredBones);
 			if (ConstraintJointIndex == EffectiveRootIndex)
 			{
+				// TODO:UE_LOG
 				return;
 			}
 
@@ -130,6 +136,7 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 	// コンストレイントは必ず一つ以上ある
 	if (IKConstraintWorkDataArray.Num() == 0)
 	{
+		// TODO:UE_LOG
 		return;
 	}
 
@@ -343,6 +350,7 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			//if (FMath::Abs(Determinant) < KINDA_SMALL_NUMBER)
 			if (FMath::Abs(Determinant) < SMALL_NUMBER)
 			{
+				// TODO:UE_LOG
 				return;
 			}
 
