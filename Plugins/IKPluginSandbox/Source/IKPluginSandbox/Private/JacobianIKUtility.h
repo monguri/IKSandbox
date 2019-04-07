@@ -194,33 +194,6 @@ FORCEINLINE float AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMatrix, AnySi
 	OutMatrix.Set(2, 1, (InMatrix.Get(0, 1) * InMatrix.Get(2, 0) - InMatrix.Get(0, 0) * InMatrix.Get(2, 1)) / Determinant);
 	OutMatrix.Set(2, 2, (InMatrix.Get(0, 0) * InMatrix.Get(1, 1) - InMatrix.Get(0, 1) * InMatrix.Get(1, 0)) / Determinant);
 
-
-	// TODO:ˆêŽž“I
-	Determinant =
-		  InMatrix.Get(3, 3) * InMatrix.Get(4, 4) * InMatrix.Get(5, 5)
-		+ InMatrix.Get(4, 3) * InMatrix.Get(5, 4) * InMatrix.Get(3, 5)
-		+ InMatrix.Get(5, 3) * InMatrix.Get(3, 4) * InMatrix.Get(4, 5)
-		- InMatrix.Get(3, 3) * InMatrix.Get(5, 4) * InMatrix.Get(4, 5)
-		- InMatrix.Get(5, 3) * InMatrix.Get(4, 4) * InMatrix.Get(3, 5)
-		- InMatrix.Get(4, 3) * InMatrix.Get(3, 4) * InMatrix.Get(5, 5);
-
-	if (Determinant == 0)
-	{
-		return Determinant;
-	}
-
-	OutMatrix.Set(3, 3, (InMatrix.Get(4, 4) * InMatrix.Get(5, 5) - InMatrix.Get(4, 5) * InMatrix.Get(5, 4)) / Determinant);
-	OutMatrix.Set(3, 4, (InMatrix.Get(3, 5) * InMatrix.Get(5, 4) - InMatrix.Get(3, 4) * InMatrix.Get(5, 5)) / Determinant);
-	OutMatrix.Set(3, 5, (InMatrix.Get(3, 4) * InMatrix.Get(4, 5) - InMatrix.Get(3, 5) * InMatrix.Get(4, 4)) / Determinant);
-
-	OutMatrix.Set(4, 3, (InMatrix.Get(4, 5) * InMatrix.Get(5, 3) - InMatrix.Get(4, 3) * InMatrix.Get(5, 5)) / Determinant);
-	OutMatrix.Set(4, 4, (InMatrix.Get(3, 3) * InMatrix.Get(5, 5) - InMatrix.Get(3, 5) * InMatrix.Get(5, 3)) / Determinant);
-	OutMatrix.Set(4, 5, (InMatrix.Get(3, 5) * InMatrix.Get(4, 3) - InMatrix.Get(3, 3) * InMatrix.Get(4, 5)) / Determinant);
-
-	OutMatrix.Set(5, 3, (InMatrix.Get(4, 3) * InMatrix.Get(5, 4) - InMatrix.Get(4, 4) * InMatrix.Get(5, 3)) / Determinant);
-	OutMatrix.Set(5, 4, (InMatrix.Get(3, 4) * InMatrix.Get(5, 3) - InMatrix.Get(3, 3) * InMatrix.Get(5, 4)) / Determinant);
-	OutMatrix.Set(5, 5, (InMatrix.Get(3, 3) * InMatrix.Get(4, 4) - InMatrix.Get(3, 4) * InMatrix.Get(4, 3)) / Determinant);
-
 	return Determinant;
 }
 
@@ -282,7 +255,7 @@ FORCEINLINE float AnySizeMatrix::InverseNxN(uint8 Size, const AnySizeMatrix& InM
 		{
 			if (i != j)
 			{
-				Multiplier = InMatrix.Get(j, i) / InMatrix.Get(i, i); // Determinant‚ª0‚Å‚È‚¯‚ê‚Î0‚Å‚È‚¢
+				Multiplier = WorkMatrix.Get(j, i) / WorkMatrix.Get(i, i); // Determinant‚ª0‚Å‚È‚¯‚ê‚Î0‚Å‚È‚¢
 
 				for (uint8 k = 0; k < Size; ++k)
 				{

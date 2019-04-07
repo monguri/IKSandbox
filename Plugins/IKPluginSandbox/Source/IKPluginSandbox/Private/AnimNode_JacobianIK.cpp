@@ -344,11 +344,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 			JJti.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 #if 0
-			//float Determinant = AnySizeMatrix::InverseNxN(AXIS_COUNT * IKConstraintWorkDataArray.Num(), JJt, JJti);
-			float Determinant = AnySizeMatrix::Inverse3x3(JJt, JJti);
+			float Determinant = AnySizeMatrix::InverseNxN(AXIS_COUNT * IKConstraintWorkDataArray.Num(), JJt, JJti);
 #else
-			//float Determinant = AnySizeMatrix::InverseNxN(AXIS_COUNT * IKConstraintWorkDataArray.Num(), JJtPlusLambdaI, JJti);
-			float Determinant = AnySizeMatrix::Inverse3x3(JJtPlusLambdaI, JJti);
+			float Determinant = AnySizeMatrix::InverseNxN(AXIS_COUNT * IKConstraintWorkDataArray.Num(), JJtPlusLambdaI, JJti);
 #endif
 			//if (FMath::Abs(Determinant) < KINDA_SMALL_NUMBER)
 			if (FMath::Abs(Determinant) < SMALL_NUMBER)
