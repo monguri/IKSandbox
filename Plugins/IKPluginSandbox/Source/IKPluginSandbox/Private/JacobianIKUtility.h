@@ -85,6 +85,7 @@ struct AnySizeMatrix
 	static void Multiply(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
 	static void Add(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
 	static float Inverse3x3(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
+	static float InverseNxN(uint8 Size, const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
 	static void TransformVector(const AnySizeMatrix& InMatrix, const TArray<float>& InVector, TArray<float>& OutVector);
 
 	TArray<float> Elements; // 1-dimensional array for access speed.
@@ -193,7 +194,8 @@ FORCEINLINE float AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMatrix, AnySi
 	OutMatrix.Set(2, 1, (InMatrix.Get(0, 1) * InMatrix.Get(2, 0) - InMatrix.Get(0, 0) * InMatrix.Get(2, 1)) / Determinant);
 	OutMatrix.Set(2, 2, (InMatrix.Get(0, 0) * InMatrix.Get(1, 1) - InMatrix.Get(0, 1) * InMatrix.Get(1, 0)) / Determinant);
 
-// TODO:6x6を扱うために一時的
+
+	// TODO:一時的
 	Determinant =
 		  InMatrix.Get(3, 3) * InMatrix.Get(4, 4) * InMatrix.Get(5, 5)
 		+ InMatrix.Get(4, 3) * InMatrix.Get(5, 4) * InMatrix.Get(3, 5)
@@ -202,7 +204,7 @@ FORCEINLINE float AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMatrix, AnySi
 		- InMatrix.Get(5, 3) * InMatrix.Get(4, 4) * InMatrix.Get(3, 5)
 		- InMatrix.Get(4, 3) * InMatrix.Get(3, 4) * InMatrix.Get(5, 5);
 
-	if (Determinant == 3)
+	if (Determinant == 0)
 	{
 		return Determinant;
 	}
@@ -218,6 +220,78 @@ FORCEINLINE float AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMatrix, AnySi
 	OutMatrix.Set(5, 3, (InMatrix.Get(4, 3) * InMatrix.Get(5, 4) - InMatrix.Get(4, 4) * InMatrix.Get(5, 3)) / Determinant);
 	OutMatrix.Set(5, 4, (InMatrix.Get(3, 4) * InMatrix.Get(5, 3) - InMatrix.Get(3, 3) * InMatrix.Get(5, 4)) / Determinant);
 	OutMatrix.Set(5, 5, (InMatrix.Get(3, 3) * InMatrix.Get(4, 4) - InMatrix.Get(3, 4) * InMatrix.Get(4, 3)) / Determinant);
+
+	return Determinant;
+}
+
+FORCEINLINE float AnySizeMatrix::InverseNxN(uint8 Size, const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix)
+{
+	// http://thira.plavox.info/blog/2008/06/_c.html　をそのまま使っている
+	float Determinant = 1.0;
+
+	// 三角行列を作成
+	AnySizeMatrix WorkMatrix = InMatrix; // コピー
+
+	for (uint8 i = 0; i < Size; ++i)
+	{
+		for (uint8 j = 0; j < Size; ++j)
+		{
+			if (i < j)
+			{
+				float Multiplier = InMatrix.Get(j, i) / InMatrix.Get(i, i);
+
+				for (uint8 k = 0; k < Size; ++k)
+				{
+					WorkMatrix.Set(j, k, (WorkMatrix.Get(j, k) - WorkMatrix.Get(i, k) * Multiplier));
+				}
+			}
+		}
+	}
+
+	// 対角部分の積
+	for (uint8 i = 0; i < Size; ++i)
+	{
+		Determinant *= WorkMatrix.Get(i, i);
+	}
+	 
+	if (FMath::Abs(Determinant) < SMALL_NUMBER)
+	{
+		return Determinant;
+	}
+
+	// 単位行列にしておく
+	for (uint8 i = 0; i < Size; ++i)
+	{
+		OutMatrix.Set(i, i, 1.0f);
+	}
+
+	WorkMatrix = InMatrix; // コピー
+
+	//掃き出し法
+	for (uint8 i = 0; i < Size; ++i)
+	{
+		float Multiplier = 1.0f / InMatrix.Get(i, i); // Determinantが0でなければ0でない
+
+		for (uint8 j = 0; j < Size; ++j)
+		{
+			WorkMatrix.Set(i, j, WorkMatrix.Get(i, j) * Multiplier);
+			OutMatrix.Set(i, j, OutMatrix.Get(i, j) * Multiplier);
+		}
+
+		for (uint8 j = 0; j < Size; ++j)
+		{
+			if (i != j)
+			{
+				Multiplier = InMatrix.Get(j, i) / InMatrix.Get(i, i); // Determinantが0でなければ0でない
+
+				for (uint8 k = 0; k < Size; ++k)
+				{
+					WorkMatrix.Set(j, k, (WorkMatrix.Get(j, k) - WorkMatrix.Get(i, k) * Multiplier));
+					OutMatrix.Set(j, k, OutMatrix.Get(j, k) - OutMatrix.Get(i, k) * Multiplier);
+				}
+			}
+		}
+	}
 
 	return Determinant;
 }

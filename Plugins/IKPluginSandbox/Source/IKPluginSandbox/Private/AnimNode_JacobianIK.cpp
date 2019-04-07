@@ -3,6 +3,7 @@
 #include "AnimNode_JacobianIK.h"
 #include "Animation/AnimInstanceProxy.h"
 
+
 FAnimNode_JacobianIK::FAnimNode_JacobianIK()
 	: NumIteration(10)
 	, Precision(SMALL_NUMBER)
@@ -343,8 +344,10 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 			JJti.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 #if 0
+			//float Determinant = AnySizeMatrix::InverseNxN(AXIS_COUNT * IKConstraintWorkDataArray.Num(), JJt, JJti);
 			float Determinant = AnySizeMatrix::Inverse3x3(JJt, JJti);
 #else
+			//float Determinant = AnySizeMatrix::InverseNxN(AXIS_COUNT * IKConstraintWorkDataArray.Num(), JJtPlusLambdaI, JJti);
 			float Determinant = AnySizeMatrix::Inverse3x3(JJtPlusLambdaI, JJti);
 #endif
 			//if (FMath::Abs(Determinant) < KINDA_SMALL_NUMBER)
