@@ -199,7 +199,7 @@ FORCEINLINE float AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMatrix, AnySi
 
 FORCEINLINE float AnySizeMatrix::InverseNxN(uint8 Size, const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix)
 {
-	// http://thira.plavox.info/blog/2008/06/_c.html　をそのまま使っている
+	// http://thira.plavox.info/blog/2008/06/_c.html　https://seesaawiki.jp/w/pafuhana1213/d/n%BC%A1%A4%CE%B5%D5%B9%D4%CE%F3 をそのまま使っている
 	float Determinant = 1.0;
 
 	// 三角行列を作成
@@ -240,17 +240,46 @@ FORCEINLINE float AnySizeMatrix::InverseNxN(uint8 Size, const AnySizeMatrix& InM
 
 	WorkMatrix = InMatrix; // コピー
 
-	//掃き出し法
+	// ピボット選択を行ったGauss-Jordan法
 	for (uint8 i = 0; i < Size; ++i)
 	{
+#if 0
+		//ピボット選択 i行i列目の要素の絶対値が最大に
+		uint8 Max = i;
+		for (uint8 j = i + 1; j < Size; ++j)
+		{
+			if (FMath::Abs(WorkMatrix.Get(j, i)) > FMath::Abs(WorkMatrix.Get(Max, i)))
+			{
+				Max = j;
+			}
+		}
+
+		// 行の入れ替え
+		if (Max != i)
+		{
+			for (uint8 j = 0; j < Size; ++j)
+			{
+				float SwapTmp = WorkMatrix.Get(Max, j);
+				WorkMatrix.Set(Max, j, WorkMatrix.Get(i, j));
+				WorkMatrix.Set(i, j, SwapTmp);
+
+				SwapTmp = OutMatrix.Get(Max, j);
+				OutMatrix.Set(Max, j, OutMatrix.Get(i, j));
+				OutMatrix.Set(i, j, SwapTmp);
+			}
+		}
+#endif
+
 		float Multiplier = 1.0f / InMatrix.Get(i, i); // Determinantが0でなければ0でない
 
+		// i行i列目の要素が1になるように
 		for (uint8 j = 0; j < Size; ++j)
 		{
 			WorkMatrix.Set(i, j, WorkMatrix.Get(i, j) * Multiplier);
 			OutMatrix.Set(i, j, OutMatrix.Get(i, j) * Multiplier);
 		}
 
+		// i行目のi列目以外の要素が0になるように
 		for (uint8 j = 0; j < Size; ++j)
 		{
 			if (i != j)
