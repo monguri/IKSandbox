@@ -125,12 +125,12 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 
 			EffectiveJointIndices.Sort(
 				[](const FCompactPoseBoneIndex& A, const FCompactPoseBoneIndex& B)
-				{
-					return A.GetInt() < B.GetInt();
-				}
+			{
+				return A.GetInt() < B.GetInt();
+			}
 			);
 
-			IKConstraintWorkDataArray.Emplace(ConstraintJointIndex, EffectiveJointIndices, IKConstraint.Position);
+			IKConstraintWorkDataArray.Emplace(ConstraintJointIndex, EffectiveJointIndices, IKConstraint.Type, IKConstraint.Position, IKConstraint.Rotation);
 		}
 	}
 

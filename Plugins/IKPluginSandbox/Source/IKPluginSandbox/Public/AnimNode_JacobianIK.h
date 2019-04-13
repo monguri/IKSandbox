@@ -10,19 +10,35 @@
 
 using namespace JacobianIKUtility;
 
+UENUM()
+enum class EIKConstraintType : uint8
+{
+	INVALID,
+	KEEP_POSITION,
+	KEEP_ROTATION,
+};
+
 USTRUCT()
 struct FIKConstraint
 {
 	//TODO: JacobianIKUtility.hの中に置きたかったがコンパイルエラーを解消できずしょうがなく
 	GENERATED_USTRUCT_BODY()
 
-	/** fixed position constraint. **/
+	/** constraint type. **/
 	UPROPERTY(EditAnywhere)
-	FVector Position; // 今のところ位置のコンストレイントだけ。今後増やす
+	EIKConstraintType Type;
+
+	/** constraint position. **/
+	UPROPERTY(EditAnywhere)
+	FVector Position;
+
+	/** constraint rotation. **/
+	UPROPERTY(EditAnywhere)
+	FRotator Rotation;
 
 	/** root joint of joints chain which effects to this IK constraint. **/
 	UPROPERTY(EditAnywhere)
-	FBoneReference EffectiveRootJoint; // 今のところ位置のコンストレイントだけ。今後増やす
+	FBoneReference EffectiveRootJoint;
 };
 
 USTRUCT()
@@ -88,10 +104,14 @@ private:
 		FCompactPoseBoneIndex JointIndex;
 		/** joints chain indices which effects to this IK constraint. It does not include self joint. **/
 		TArray<FCompactPoseBoneIndex> EffectiveJointIndices; // このコンストレイントIK計算を行う
+		/** constraint type. **/
+		EIKConstraintType Type;
 		/** constraint position **/
 		FVector Position;
+		/** constraint rotation. **/
+		FRotator Rotation;
 
-		IKConstraintWorkData(const FCompactPoseBoneIndex& _JointIndex, const TArray<FCompactPoseBoneIndex>& _EffectiveJointIndices, const FVector& _Position) : JointIndex(_JointIndex), EffectiveJointIndices(_EffectiveJointIndices), Position(_Position) {};
+		IKConstraintWorkData(const FCompactPoseBoneIndex& _JointIndex, const TArray<FCompactPoseBoneIndex>& _EffectiveJointIndices, EIKConstraintType _Type, const FVector& _Position, const FRotator& _Rotation) : JointIndex(_JointIndex), EffectiveJointIndices(_EffectiveJointIndices), Type(_Type), Position(_Position), Rotation(_Rotation) {};
 	};
 
 	TMap<int32, IKJointWorkData> IKJointWorkDataMap;
