@@ -92,10 +92,17 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 
 	IKConstraintWorkDataArray.Empty(IKConstraintWorkDataArray.Num());
 
+	uint32 NumPositionConstraint = 0;
+
 	for (FIKJoint& IKJoint : IKSkeleton)
 	{
 		for (const FIKConstraint& IKConstraint : IKJoint.Constraints)
 		{
+			if (IKConstraint.Type == EIKConstraintType::INVALID)
+			{
+				continue;
+			}
+
 			if (!IKConstraint.EffectiveRootJoint.IsValidToEvaluate(RequiredBones))
 			{
 				// TODO:UE_LOG
@@ -130,6 +137,11 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 			}
 			);
 
+			if (IKConstraint.Type == EIKConstraintType::KEEP_POSITION)
+			{
+				NumPositionConstraint++;
+			}
+
 			IKConstraintWorkDataArray.Emplace(ConstraintJointIndex, EffectiveJointIndices, IKConstraint.Type, IKConstraint.Position, IKConstraint.Rotation);
 		}
 	}
@@ -150,22 +162,22 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 	);
 
 
-	Jacobian = AnySizeMatrix(IKJointWorkDataMap.Num() * ROTATION_AXIS_COUNT, AXIS_COUNT * IKConstraintWorkDataArray.Num());
-	Jt = AnySizeMatrix(AXIS_COUNT * IKConstraintWorkDataArray.Num(), IKJointWorkDataMap.Num() * ROTATION_AXIS_COUNT);
-	JJt = AnySizeMatrix(AXIS_COUNT * IKConstraintWorkDataArray.Num(), AXIS_COUNT * IKConstraintWorkDataArray.Num()); // J * Jt
+	Jacobian = AnySizeMatrix(IKJointWorkDataMap.Num() * ROTATION_AXIS_COUNT, AXIS_COUNT * NumPositionConstraint);
+	Jt = AnySizeMatrix(AXIS_COUNT * NumPositionConstraint, IKJointWorkDataMap.Num() * ROTATION_AXIS_COUNT);
+	JJt = AnySizeMatrix(AXIS_COUNT * NumPositionConstraint, AXIS_COUNT * NumPositionConstraint); // J * Jt
 
-	LambdaI = AnySizeMatrix(AXIS_COUNT * IKConstraintWorkDataArray.Num(), AXIS_COUNT * IKConstraintWorkDataArray.Num()); // lambda * I
+	LambdaI = AnySizeMatrix(AXIS_COUNT * NumPositionConstraint, AXIS_COUNT * NumPositionConstraint); // lambda * I
 	LambdaI.ZeroClear();
-	for (int32 i = 0; i < AXIS_COUNT * IKConstraintWorkDataArray.Num(); i++)
+	for (uint32 i = 0; i < AXIS_COUNT * NumPositionConstraint; i++)
 	{
 		LambdaI.Set(i, i, Lambda);
 	}
 
-	JJtPlusLambdaI = AnySizeMatrix(AXIS_COUNT * IKConstraintWorkDataArray.Num(), AXIS_COUNT * IKConstraintWorkDataArray.Num()); // J * J^t + lambda * I
-	JJti = AnySizeMatrix(AXIS_COUNT * IKConstraintWorkDataArray.Num(), AXIS_COUNT * IKConstraintWorkDataArray.Num()); // (J * J^t + lambda * I)^-1
-	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT * IKConstraintWorkDataArray.Num(), IKJointWorkDataMap.Num() * ROTATION_AXIS_COUNT); // J^t * (J * J^t)^-1
+	JJtPlusLambdaI = AnySizeMatrix(AXIS_COUNT * NumPositionConstraint, AXIS_COUNT * NumPositionConstraint); // J * J^t + lambda * I
+	JJti = AnySizeMatrix(AXIS_COUNT * NumPositionConstraint, AXIS_COUNT * NumPositionConstraint); // (J * J^t + lambda * I)^-1
+	PseudoInverseJacobian = AnySizeMatrix(AXIS_COUNT * NumPositionConstraint, IKJointWorkDataMap.Num() * ROTATION_AXIS_COUNT); // J^t * (J * J^t)^-1
 
-	IterationStepPosition.SetNumZeroed(AXIS_COUNT * IKConstraintWorkDataArray.Num());
+	IterationStepPosition.SetNumZeroed(AXIS_COUNT * NumPositionConstraint);
 	IterationStepAngles.SetNumZeroed(IKJointWorkDataMap.Num() * ROTATION_AXIS_COUNT);
 
 	bValidToEvaluate = true;
@@ -186,9 +198,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 	// TODO:各IKノードと共通化しよう
 	// そもそもジョイントの長さ的にIKの解に到達しうるかの確認
 	// コンストレイントごとに確認する
-	for (int32 ConstraintIndex = 0; ConstraintIndex < IKConstraintWorkDataArray.Num(); ConstraintIndex++)
+	uint32 PositionConstraintIndex = 0;
+	for (const IKConstraintWorkData& Constraint : IKConstraintWorkDataArray)
 	{
-		const IKConstraintWorkData& Constraint = IKConstraintWorkDataArray[ConstraintIndex];
 		float IKJointTotalLength = 0; // このアニメーションノードに入力されるポーズにScaleがないなら、一度だけ計算してキャッシュしておけばよいが、今は毎回計算する
 		// TODO:だがチェック処理にしては毎フレームの計算コスト高すぎかも
 
@@ -207,14 +219,32 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			return;
 		}
 
-		// ノードの入力されたエフェクタの位置から目標位置への差分ベクトル
-		const FVector& DeltaLocation = Constraint.Position - Output.Pose.GetComponentSpaceTransform(Constraint.JointIndex).GetLocation();
+		switch (Constraint.Type)
+		{
+			case EIKConstraintType::KEEP_POSITION:
+			{
+				// ノードの入力されたエフェクタの位置から目標位置への差分ベクトル
+				const FVector& DeltaLocation = Constraint.Position - Output.Pose.GetComponentSpaceTransform(Constraint.JointIndex).GetLocation();
 
-		// 毎イテレーションでの位置移動
-		const FVector& IterationStep = DeltaLocation / NumIteration;
-		IterationStepPosition[ConstraintIndex * AXIS_COUNT + 0] = IterationStep.X;
-		IterationStepPosition[ConstraintIndex * AXIS_COUNT + 1] = IterationStep.Y;
-		IterationStepPosition[ConstraintIndex * AXIS_COUNT + 2] = IterationStep.Z;
+				// 毎イテレーションでの位置移動
+				const FVector& IterationStep = DeltaLocation / NumIteration;
+				IterationStepPosition[PositionConstraintIndex * AXIS_COUNT + 0] = IterationStep.X;
+				IterationStepPosition[PositionConstraintIndex * AXIS_COUNT + 1] = IterationStep.Y;
+				IterationStepPosition[PositionConstraintIndex * AXIS_COUNT + 2] = IterationStep.Z;
+				PositionConstraintIndex++;
+			}
+				break;
+			case EIKConstraintType::KEEP_ROTATION:
+			{
+
+			}
+				break;
+			case EIKConstraintType::INVALID:
+				// fall through
+			default:
+				check(false)
+				break;
+		}
 	}
 
 	// ワークデータのTransformの初期化
