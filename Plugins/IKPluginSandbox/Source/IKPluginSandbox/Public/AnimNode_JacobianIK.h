@@ -14,7 +14,9 @@ UENUM()
 enum class EIKConstraintType : uint8
 {
 	INVALID,
+	// IKSkeletonのコンポーネントスペースにおける位置を指定して維持する
 	KEEP_POSITION,
+	// IKSkeletonのジョイントのローカルスペースにおける回転角を指定して維持する
 	KEEP_ROTATION,
 };
 
@@ -36,7 +38,8 @@ struct FIKConstraint
 	UPROPERTY(EditAnywhere)
 	FRotator Rotation;
 
-	/** root joint of joints chain which effects to this IK constraint. **/
+	// TODO:位置コンストレイント以外のタイプなら非表示にした方がいいかも
+	/** root joint of joints chain which effects to this IK constraint. It is necessary at position constraint. **/
 	UPROPERTY(EditAnywhere)
 	FBoneReference EffectiveRootJoint;
 };
@@ -102,8 +105,8 @@ private:
 	{
 		/** target joint index of constraint. **/
 		FCompactPoseBoneIndex JointIndex;
-		/** joints chain indices which effects to this IK constraint. It does not include self joint. **/
-		TArray<FCompactPoseBoneIndex> EffectiveJointIndices; // このコンストレイントIK計算を行う
+		/** joints chain indices which effects to this IK position constraint. It does not include self joint. **/
+		TArray<FCompactPoseBoneIndex> EffectiveJointIndices;
 		/** constraint type. **/
 		EIKConstraintType Type;
 		/** constraint position **/

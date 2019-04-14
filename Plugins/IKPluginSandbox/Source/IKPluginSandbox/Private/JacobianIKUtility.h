@@ -85,7 +85,7 @@ struct AnySizeMatrix
 	static void Multiply(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
 	static void Add(const AnySizeMatrix& A, const AnySizeMatrix& B, AnySizeMatrix& OutResult);
 	static float Inverse3x3(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
-	static float InverseNxN(uint8 Size, const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
+	static float InverseNxN(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix);
 	static void TransformVector(const AnySizeMatrix& InMatrix, const TArray<float>& InVector, TArray<float>& OutVector);
 
 	TArray<float> Elements; // 1-dimensional array for access speed.
@@ -197,10 +197,15 @@ FORCEINLINE float AnySizeMatrix::Inverse3x3(const AnySizeMatrix& InMatrix, AnySi
 	return Determinant;
 }
 
-FORCEINLINE float AnySizeMatrix::InverseNxN(uint8 Size, const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix)
+FORCEINLINE float AnySizeMatrix::InverseNxN(const AnySizeMatrix& InMatrix, AnySizeMatrix& OutMatrix)
 {
 	// http://thira.plavox.info/blog/2008/06/_c.html　https://seesaawiki.jp/w/pafuhana1213/d/n%BC%A1%A4%CE%B5%D5%B9%D4%CE%F3 をそのまま使っている
 	float Determinant = 1.0;
+
+	uint8 Size = InMatrix.NumRow;
+	check(Size == InMatrix.NumColumn);
+	check(Size == OutMatrix.NumRow);
+	check(Size == OutMatrix.NumColumn);
 
 	// 三角行列を作成
 	AnySizeMatrix WorkMatrix = InMatrix; // コピー

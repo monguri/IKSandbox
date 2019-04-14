@@ -42,11 +42,14 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 
 		for (FIKConstraint& IKConstraint : IKJoint.Constraints)
 		{
-			// EffectiveRootJointはすでにどれかのFIKJointで指定されておりInitializeされているはず
-			if (!IKConstraint.EffectiveRootJoint.Initialize(RequiredBones))
+			if (IKConstraint.Type == EIKConstraintType::KEEP_POSITION)
 			{
-				// TODO:UE_LOG
-				return;
+				// EffectiveRootJointはすでにどれかのFIKJointで指定されておりInitializeされているはず
+				if (!IKConstraint.EffectiveRootJoint.Initialize(RequiredBones))
+				{
+					// TODO:UE_LOG
+					return;
+				}
 			}
 		}
 	}
@@ -103,42 +106,44 @@ void FAnimNode_JacobianIK::InitializeBoneReferences(const FBoneContainer& Requir
 				continue;
 			}
 
-			if (!IKConstraint.EffectiveRootJoint.IsValidToEvaluate(RequiredBones))
-			{
-				// TODO:UE_LOG
-				return;
-			}
-
 			const FCompactPoseBoneIndex& ConstraintJointIndex = IKJoint.Joint.GetCompactPoseIndex(RequiredBones);
-			const FCompactPoseBoneIndex& EffectiveRootIndex = IKConstraint.EffectiveRootJoint.GetCompactPoseIndex(RequiredBones);
-			if (ConstraintJointIndex == EffectiveRootIndex)
-			{
-				// TODO:UE_LOG
-				return;
-			}
-
 			TArray<FCompactPoseBoneIndex> EffectiveJointIndices;
-
-			FCompactPoseBoneIndex JointIndex = ConstraintJointIndex;
-			IKJointWorkData WorkData = IKJointWorkDataMap[JointIndex.GetInt()];
-
-			for (JointIndex = WorkData.ParentJointIndex, WorkData = IKJointWorkDataMap[JointIndex.GetInt()]; // 自分はEffectiveJointIndicesには含めない
-				JointIndex != EffectiveRootIndex && JointIndex != WorkData.ParentJointIndex; // IKスケルトンのルートに達したときもループは抜ける
-				JointIndex = WorkData.ParentJointIndex, WorkData = IKJointWorkDataMap[JointIndex.GetInt()])
-			{
-				EffectiveJointIndices.Add(JointIndex);
-			}
-			EffectiveJointIndices.Add(JointIndex); // EffectiveRootIndexも含める
-
-			EffectiveJointIndices.Sort(
-				[](const FCompactPoseBoneIndex& A, const FCompactPoseBoneIndex& B)
-			{
-				return A.GetInt() < B.GetInt();
-			}
-			);
 
 			if (IKConstraint.Type == EIKConstraintType::KEEP_POSITION)
 			{
+				// PositionコンストレイントのときはIK計算に加えるジョイントをすべて洗い出す
+
+				if (!IKConstraint.EffectiveRootJoint.IsValidToEvaluate(RequiredBones))
+				{
+					// TODO:UE_LOG
+					return;
+				}
+
+				const FCompactPoseBoneIndex& EffectiveRootIndex = IKConstraint.EffectiveRootJoint.GetCompactPoseIndex(RequiredBones);
+				if (ConstraintJointIndex == EffectiveRootIndex)
+				{
+					// TODO:UE_LOG
+					return;
+				}
+
+				FCompactPoseBoneIndex JointIndex = ConstraintJointIndex;
+				IKJointWorkData WorkData = IKJointWorkDataMap[JointIndex.GetInt()];
+
+				for (JointIndex = WorkData.ParentJointIndex, WorkData = IKJointWorkDataMap[JointIndex.GetInt()]; // 自分はEffectiveJointIndicesには含めない
+					JointIndex != EffectiveRootIndex && JointIndex != WorkData.ParentJointIndex; // IKスケルトンのルートに達したときもループは抜ける
+					JointIndex = WorkData.ParentJointIndex, WorkData = IKJointWorkDataMap[JointIndex.GetInt()])
+				{
+					EffectiveJointIndices.Add(JointIndex);
+				}
+				EffectiveJointIndices.Add(JointIndex); // EffectiveRootIndexも含める
+
+				EffectiveJointIndices.Sort(
+					[](const FCompactPoseBoneIndex& A, const FCompactPoseBoneIndex& B)
+				{
+					return A.GetInt() < B.GetInt();
+				}
+				);
+
 				NumPositionConstraint++;
 			}
 
@@ -195,34 +200,41 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
 
+	// ワークデータのTransformの初期化
+	for (TPair<int32, IKJointWorkData>& WorkData : IKJointWorkDataMap)
+	{
+		WorkData.Value.ComponentTransform = Output.Pose.GetComponentSpaceTransform(FCompactPoseBoneIndex(WorkData.Key));
+		WorkData.Value.LocalTransform = WorkData.Value.ComponentTransform * Output.Pose.GetComponentSpaceTransform(FCompactPoseBoneIndex(WorkData.Value.ParentJointIndex)).Inverse();
+	}
+
 	// TODO:各IKノードと共通化しよう
-	// そもそもジョイントの長さ的にIKの解に到達しうるかの確認
-	// コンストレイントごとに確認する
 	uint32 PositionConstraintIndex = 0;
 	for (const IKConstraintWorkData& Constraint : IKConstraintWorkDataArray)
 	{
-		float IKJointTotalLength = 0; // このアニメーションノードに入力されるポーズにScaleがないなら、一度だけ計算してキャッシュしておけばよいが、今は毎回計算する
-		// TODO:だがチェック処理にしては毎フレームの計算コスト高すぎかも
-
-		// エフェクタのボーン以外の長さの合計
-		for (int32 i = 0; i < Constraint.EffectiveJointIndices.Num() - 1; i++)
-		{
-			IKJointTotalLength += (Output.Pose.GetComponentSpaceTransform(Constraint.EffectiveJointIndices[i + 1]).GetLocation() - Output.Pose.GetComponentSpaceTransform(Constraint.EffectiveJointIndices[i]).GetLocation()).Size();
-		}
-		// エフェクタのボーンも合計する
-		IKJointTotalLength += (Output.Pose.GetComponentSpaceTransform(Constraint.JointIndex).GetLocation() - Output.Pose.GetComponentSpaceTransform(Constraint.EffectiveJointIndices[Constraint.EffectiveJointIndices.Num() - 1]).GetLocation()).Size();
-
-		float EffectorToIKRootLength = (Constraint.Position - Output.Pose.GetComponentSpaceTransform(Constraint.EffectiveJointIndices[0]).GetLocation()).Size();
-		if (IKJointTotalLength < EffectorToIKRootLength)
-		{
-			UE_LOG(LogAnimation, Warning, TEXT("IK cannot reach effector target location. The total length of joints is not enough."));
-			return;
-		}
-
 		switch (Constraint.Type)
 		{
 			case EIKConstraintType::KEEP_POSITION:
 			{
+				// そもそもジョイントの長さ的にIKの解に到達しうるかの確認
+				// コンストレイントごとに確認する
+				float IKJointTotalLength = 0; // このアニメーションノードに入力されるポーズにScaleがないなら、一度だけ計算してキャッシュしておけばよいが、今は毎回計算する
+				// TODO:だがチェック処理にしては毎フレームの計算コスト高すぎかも
+
+				// エフェクタのボーン以外の長さの合計
+				for (int32 i = 0; i < Constraint.EffectiveJointIndices.Num() - 1; i++)
+				{
+					IKJointTotalLength += (Output.Pose.GetComponentSpaceTransform(Constraint.EffectiveJointIndices[i + 1]).GetLocation() - Output.Pose.GetComponentSpaceTransform(Constraint.EffectiveJointIndices[i]).GetLocation()).Size();
+				}
+				// エフェクタのボーンも合計する
+				IKJointTotalLength += (Output.Pose.GetComponentSpaceTransform(Constraint.JointIndex).GetLocation() - Output.Pose.GetComponentSpaceTransform(Constraint.EffectiveJointIndices[Constraint.EffectiveJointIndices.Num() - 1]).GetLocation()).Size();
+
+				float EffectorToIKRootLength = (Constraint.Position - Output.Pose.GetComponentSpaceTransform(Constraint.EffectiveJointIndices[0]).GetLocation()).Size();
+				if (IKJointTotalLength < EffectorToIKRootLength)
+				{
+					UE_LOG(LogAnimation, Warning, TEXT("IK cannot reach effector target location. The total length of joints is not enough."));
+					return;
+				}
+
 				// ノードの入力されたエフェクタの位置から目標位置への差分ベクトル
 				const FVector& DeltaLocation = Constraint.Position - Output.Pose.GetComponentSpaceTransform(Constraint.JointIndex).GetLocation();
 
@@ -236,7 +248,13 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				break;
 			case EIKConstraintType::KEEP_ROTATION:
 			{
+				IKJointWorkData& WorkData = IKJointWorkDataMap.FindChecked(Constraint.JointIndex.GetInt());
 
+				const FRotator& DeltaRotation = Constraint.Rotation - Output.Pose.GetComponentSpaceTransform(Constraint.JointIndex).GetRotation().Rotator();
+				WorkData.LocalTransform.SetRotation(FQuat(Constraint.Rotation));
+				WorkData.LocalTransform.NormalizeRotation();
+
+				WorkData.ComponentTransform = WorkData.LocalTransform * Output.Pose.GetComponentSpaceTransform(FCompactPoseBoneIndex(WorkData.ParentJointIndex));
 			}
 				break;
 			case EIKConstraintType::INVALID:
@@ -245,13 +263,6 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				check(false)
 				break;
 		}
-	}
-
-	// ワークデータのTransformの初期化
-	for (TPair<int32, IKJointWorkData>& WorkData : IKJointWorkDataMap)
-	{
-		WorkData.Value.ComponentTransform = Output.Pose.GetComponentSpaceTransform(FCompactPoseBoneIndex(WorkData.Key));
-		WorkData.Value.LocalTransform = WorkData.Value.ComponentTransform * Output.Pose.GetComponentSpaceTransform(FCompactPoseBoneIndex(WorkData.Value.ParentJointIndex)).Inverse();
 	}
 
 	// JacobianIKのメインアルゴリズム
@@ -271,9 +282,14 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 				IKJointWorkData& WorkData = WorkDataPair.Value;
 				const FCompactPoseBoneIndex& JointIndex = FCompactPoseBoneIndex(WorkDataPair.Key);
 
-				for (int32 ConstraintIndex = 0; ConstraintIndex < IKConstraintWorkDataArray.Num(); ConstraintIndex++)
+				PositionConstraintIndex = 0;
+				for (IKConstraintWorkData& Constraint : IKConstraintWorkDataArray)
 				{
-					const IKConstraintWorkData& Constraint = IKConstraintWorkDataArray[ConstraintIndex];
+					if (Constraint.Type != EIKConstraintType::KEEP_POSITION)
+					{
+						continue;
+					}
+
 					bool bEffectiveJoint = false;
 					for (const FCompactPoseBoneIndex& EffectiveJoint : Constraint.EffectiveJointIndices)
 					{
@@ -339,9 +355,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 						for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
 						{
 							const FVector& JacobianRow = (ChildRestMatrix * LocalMatrix[RotAxis] * ParentRestMatrix).TransformPosition(FVector::ZeroVector);
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 0, JacobianRow.X);
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 1, JacobianRow.Y);	
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 2, JacobianRow.Z);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, PositionConstraintIndex * AXIS_COUNT + 0, JacobianRow.X);
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, PositionConstraintIndex * AXIS_COUNT + 1, JacobianRow.Y);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, PositionConstraintIndex * AXIS_COUNT + 2, JacobianRow.Z);	
 						}
 					}
 					else
@@ -349,11 +365,13 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 						// このジョイントがこのコンストレイントに影響を及ぼすジョイントでないときはヤコビアンの要素は0
 						for (int32 RotAxis = 0; RotAxis < ROTATION_AXIS_COUNT; ++RotAxis)
 						{
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 0, 0.0f);
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 1, 0.0f);	
-							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, ConstraintIndex * AXIS_COUNT + 2, 0.0f);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, PositionConstraintIndex * AXIS_COUNT + 0, 0.0f);
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, PositionConstraintIndex * AXIS_COUNT + 1, 0.0f);	
+							Jacobian.Set(RotationIndex * ROTATION_AXIS_COUNT + RotAxis, PositionConstraintIndex * AXIS_COUNT + 2, 0.0f);	
 						}
 					}
+
+					PositionConstraintIndex++;
 				}
 
 				RotationIndex++;
@@ -374,9 +392,9 @@ void FAnimNode_JacobianIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 			JJti.ZeroClear(); // 最終的に全要素に値が入るので0クリアする必要はないがデバッグのしやすさのために0クリアする
 #if 0
-			float Determinant = AnySizeMatrix::InverseNxN(AXIS_COUNT * IKConstraintWorkDataArray.Num(), JJt, JJti);
+			float Determinant = AnySizeMatrix::InverseNxN(JJt, JJti);
 #else
-			float Determinant = AnySizeMatrix::InverseNxN(AXIS_COUNT * IKConstraintWorkDataArray.Num(), JJtPlusLambdaI, JJti);
+			float Determinant = AnySizeMatrix::InverseNxN(JJtPlusLambdaI, JJti);
 #endif
 			//if (FMath::Abs(Determinant) < KINDA_SMALL_NUMBER)
 			if (FMath::Abs(Determinant) < SMALL_NUMBER)
